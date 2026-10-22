@@ -1,0 +1,18 @@
+## Interface: 110002
+## Title: Deedkeeper
+## Notes: Custom RP achievements, titles, and rival challenges. v1: tracking engine.
+## Author: charl
+## Version: 0.2.0
+## SavedVariables: DeedkeeperDB
+## SavedVariablesPerCharacter: DeedkeeperCharDB
+
+# NOTE: ## Interface above must match the WoW-Forever client build or the addon
+# shows as "out of date". If it does, tick "Load out of date AddOns" on the
+# character-select AddOns screen, or run /run print((select(4, GetBuildInfo())))
+# in-game and set this number to what it prints.
+
+Core.lua
+Tracking\Engine.lua
+Tracking\Sources\KillSource.lua
+UI\MiniPanel.lua
+UI\AuthorForm.lua
