@@ -1,4 +1,4 @@
-## Interface: 110002
+## Interface: 16001
 ## Title: Deedkeeper
 ## Notes: Custom RP achievements, titles, and rival challenges. v1: tracking engine.
 ## Author: charl
@@ -6,10 +6,13 @@
 ## SavedVariables: DeedkeeperDB
 ## SavedVariablesPerCharacter: DeedkeeperCharDB
 
-# NOTE: ## Interface above must match the WoW-Forever client build or the addon
-# shows as "out of date". If it does, tick "Load out of date AddOns" on the
-# character-select AddOns screen, or run /run print((select(4, GetBuildInfo())))
-# in-game and set this number to what it prints.
+# NOTE: ## Interface above is the client's TOC version, NOT its build number.
+# WoW-Forever 1.60.1 (build 70532, Oct 20 2026) reports TOC version 16001.
+# To re-check after a client patch, run in-game:
+#   /run print(GetBuildInfo())
+# which prints version, build, date, tocversion -- use the LAST value here.
+# If the addon still shows as out of date, tick "Load out of date AddOns" on
+# the character-select AddOns screen.
 
 Core.lua
 Diagnostics.lua

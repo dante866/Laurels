@@ -130,6 +130,9 @@ SlashCmdList.DEEDKEEPER = function(msg)
     elseif cmd == "whoami" then
         if ns.Diag then ns.Diag:WhoAmI() end
 
+    elseif cmd == "commtest" then
+        if ns.Diag then ns.Diag:CommTest() end
+
     elseif cmd == "rivals" then
         local t = ns.Engine:GetTracker(rest)
         if not t then
@@ -189,6 +192,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed unpublish <id>  stop broadcasting a deed")
         ns:Print("  /deed rivals <id>     show the leaderboard for a deed")
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")
+        ns:Print("  /deed commtest        test whether addon messages work (diagnostic)")
         ns:Print("  /deed test <n> <name> simulate n kills of <name> (for testing)")
 
     else

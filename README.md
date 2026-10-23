@@ -10,9 +10,15 @@ tracks your progress and awards the title. A later version lets other addon user
 > server controls real titles; an addon can't grant them. Deedkeeper stores and
 > displays them itself, and (v2) shares them peer-to-peer with other addon users.
 
-Target client: **WoW-Forever (retail-based API)**. ⚠️ *Verify the build* — in game run
-`/run print((select(4, GetBuildInfo())))` and set `## Interface` in `Deedkeeper.toc`
-to match, or the addon shows as out of date.
+Target client: **WoW-Forever (retail-based API)** — version `1.60.1`, build `70532`
+(Oct 20 2026), which reports **TOC version `16001`**. That is the value in
+`## Interface` in `Deedkeeper.toc`.
+
+⚠️ After a client patch, re-check with `/run print(GetBuildInfo())` — it prints
+*version, build, date, tocversion* and the **last** value is the one `## Interface`
+needs. Don't use the build number: this client's TOC version (`16001`) and build
+(`70532`) are nowhere near each other, and mixing them up makes the addon show as
+incompatible and silently not load (no error, slash commands just don't register).
 
 ## Status
 
