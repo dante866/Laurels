@@ -31,6 +31,59 @@ local function makeEdit(parent, w, numeric)
     return e
 end
 
+-- --- zones -----------------------------------------------------------------
+
+local ANY_ZONE = "Any zone  |cff999999(not scoped)|r"
+
+local function currentZone()
+    local name = GetZoneText and GetZoneText()
+    if name == "" then name = nil end
+    local id
+    if C_Map and C_Map.GetBestMapForUnit then
+        id = C_Map.GetBestMapForUnit("player")
+    end
+    return name, id
+end
+
+-- Walk up from where the player is standing to the top of the map tree rather
+-- than hardcoding a world uiMapID. This is a custom server and may renumber
+-- maps, so discovering the root is safer than assuming retail's.
+local function rootMapID()
+    if not (C_Map and C_Map.GetBestMapForUnit and C_Map.GetMapInfo) then return nil end
+    local id = C_Map.GetBestMapForUnit("player")
+    for _ = 1, 20 do -- bounded: a cycle in the map tree must not hang the UI
+        if not id then return nil end
+        local info = C_Map.GetMapInfo(id)
+        if not info or not info.parentMapID or info.parentMapID == 0 then return id end
+        id = info.parentMapID
+    end
+    return id
+end
+
+-- Every zone the client knows about, alphabetically. Returns an empty list on
+-- any client that won't answer, which is fine -- the dropdown still offers
+-- "Any zone" and "Current zone", so zone scoping never becomes unreachable.
+local function collectZones()
+    local out = {}
+    if not (C_Map and C_Map.GetMapChildrenInfo) then return out end
+    local root = rootMapID()
+    if not root then return out end
+
+    local ZONE = (Enum and Enum.UIMapType and Enum.UIMapType.Zone) or 3
+    local ok, kids = pcall(C_Map.GetMapChildrenInfo, root, ZONE, true)
+    if not ok or type(kids) ~= "table" then return out end
+
+    local seen = {}
+    for _, info in ipairs(kids) do
+        if info.name and info.name ~= "" and not seen[info.name] then
+            seen[info.name] = true
+            table.insert(out, { zone = info.name, zoneID = info.mapID })
+        end
+    end
+    table.sort(out, function(a, b) return a.zone < b.zone end)
+    return out
+end
+
 local function parseNpcIDs(str)
     str = trim(str)
     if str == "" then return nil end
@@ -47,7 +100,7 @@ function AuthorForm:GetFrame()
 
     local f = CreateFrame("Frame", "DeedkeeperAuthorForm", UIParent,
         BackdropTemplateMixin and "BackdropTemplate" or nil)
-    f:SetSize(390, 430)
+    f:SetSize(390, 472)
     f:SetPoint("CENTER", 130, 0)
     if f.SetBackdrop then
         f:SetBackdrop({
@@ -93,10 +146,58 @@ function AuthorForm:GetFrame()
     hint:SetPoint("TOPLEFT", 122, -152)
     hint:SetText("optional, comma-separated \226\128\147 narrows the match")
 
-    makeLabel(f, "Tiers  (count \226\134\146 title)", 20, -182)
+    makeLabel(f, "Zone", 20, -178)
+    local dd = CreateFrame("Frame", "DeedkeeperZoneDropDown", f,
+        "UIDropDownMenuTemplate")
+    dd:SetPoint("TOPLEFT", 104, -172)
+    f.zoneDrop = dd
+    f.zoneChoice = nil -- nil = any zone; otherwise { zone, zoneID }
+
+    local function chooseZone(choice, label)
+        f.zoneChoice = choice
+        UIDropDownMenu_SetText(dd, label)
+        CloseDropDownMenus()
+    end
+
+    UIDropDownMenu_Initialize(dd, function()
+        local info = UIDropDownMenu_CreateInfo()
+        info.text = ANY_ZONE
+        info.notCheckable = true
+        info.func = function() chooseZone(nil, ANY_ZONE) end
+        UIDropDownMenu_AddButton(info)
+
+        local here, hereID = currentZone()
+        if here then
+            info = UIDropDownMenu_CreateInfo()
+            info.text = ("Current zone \226\128\148 %s"):format(here)
+            info.notCheckable = true
+            -- Resolved now rather than at save time, so the deed means the
+            -- zone you picked it in, not wherever you happen to be on Save.
+            info.func = function()
+                chooseZone({ zone = here, zoneID = hereID }, here)
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+
+        for _, z in ipairs(f.zoneList or {}) do
+            local entry = UIDropDownMenu_CreateInfo()
+            entry.text = z.zone
+            entry.notCheckable = true
+            entry.func = function() chooseZone(z, z.zone) end
+            UIDropDownMenu_AddButton(entry)
+        end
+    end)
+    UIDropDownMenu_SetWidth(dd, 210)
+    UIDropDownMenu_SetText(dd, ANY_ZONE)
+
+    local zhint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    zhint:SetPoint("TOPLEFT", 122, -198)
+    zhint:SetText("optional \226\128\147 only counts kills in that zone")
+
+    makeLabel(f, "Tiers  (count \226\134\146 title)", 20, -224)
     f.tierRows = {}
     for i = 1, TIER_ROWS do
-        local y = -202 - (i - 1) * 28
+        local y = -244 - (i - 1) * 28
         local cnt = makeEdit(f, 70, true)
         cnt:SetPoint("TOPLEFT", 30, y)
         local ttl = makeEdit(f, 210)
@@ -126,6 +227,8 @@ function AuthorForm:Clear()
     f.nameEdit:SetText("")
     f.matchEdit:SetText("")
     f.npcEdit:SetText("")
+    f.zoneChoice = nil
+    if f.zoneDrop then UIDropDownMenu_SetText(f.zoneDrop, ANY_ZONE) end
     for _, r in ipairs(f.tierRows) do
         r.count:SetText("")
         r.title:SetText("")
@@ -134,6 +237,9 @@ end
 
 function AuthorForm:Open()
     local f = self:GetFrame()
+    -- Rebuilt per open: the zone list needs a loaded map tree, which isn't
+    -- guaranteed at addon load, and "Current zone" should follow the player.
+    f.zoneList = collectZones()
     self:Clear()
     f:Show()
     f.nameEdit:SetFocus()
@@ -155,8 +261,18 @@ function AuthorForm:Save()
     if nameContains ~= "" then match.nameContains = nameContains end
     local npcIDs = parseNpcIDs(f.npcEdit:GetText())
     if npcIDs then match.npcIDs = npcIDs end
+
+    -- A zone on its own is a legitimate deed ("500 kills in Westfall"), so it
+    -- counts toward the deed matching something.
+    local zc = f.zoneChoice
+    if zc then
+        if zc.zone then match.zone = zc.zone end
+        if zc.zoneID then match.zoneID = zc.zoneID end
+    end
+
     if not next(match) then
-        ns:Print("Add a 'Mob name has' value or NPC IDs so the deed can match something.")
+        ns:Print("Give the deed something to match: a 'Mob name has' value, "
+            .. "NPC IDs, or a zone.")
         return
     end
 
@@ -179,7 +295,8 @@ function AuthorForm:Save()
         match = match,
         tiers = tiers,
     })
-    ns:Print(("Created deed: %s (%d tier%s)."):format(
-        def.name, #tiers, #tiers == 1 and "" or "s"))
+    ns:Print(("Created deed: %s (%d tier%s)%s."):format(
+        def.name, #tiers, #tiers == 1 and "" or "s",
+        match.zone and (" in " .. match.zone) or ""))
     f:Hide()
 end

@@ -113,11 +113,16 @@ everywhere. The two are one assertion — *where the kill happened* — so eithe
 alone is enough: a name survives a map we have no ID for, an ID survives
 localization. A deed with no zone criterion ignores zone entirely.
 
+`/deed new` has a **Zone** dropdown: *Any zone* (the default), *Current zone*,
+or any zone the client knows about. The list is read from the client's own map
+data and discovers the map root by walking up from where you're standing, so it
+doesn't depend on retail's map IDs. If a client won't answer, the dropdown
+still offers *Any zone* and *Current zone*.
+
+A zone on its own is a valid deed — "500 kills in Westfall", no mob filter.
+
 `/deed test` sends the zone you're standing in, so append `@Zone` to test a
 deed for somewhere else: `/deed test 25 Dust Devil @Westfall`.
-
-The authoring form doesn't expose a zone field yet — zone-scoped deeds are
-currently reachable from Lua (see below) rather than `/deed new`.
 
 ## Architecture
 
