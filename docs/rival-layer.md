@@ -43,22 +43,29 @@ WoW addon messages go over a chat channel via
 `C_ChatInfo.SendAddonMessage(prefix, body, channel[, target])`, after
 `C_ChatInfo.RegisterAddonMessagePrefix("DEEDK")`.
 
-This section originally recommended `YELL` for a proximity broadcast. **That
-does not work on this client.** Measured in-game with `/deed commtest` on
-WoW-Forever 1.60.1 (build 70532, TOC 16001), prefix registered successfully:
+Which chat types carry addon messages is a **per-client fact, not a constant.**
+Measured with `/deed commtest`, prefix registered successfully on both:
 
-| Channel | `SendAddonMessage` result | Delivered? |
+| Channel | WoW-Forever 1.60.1 (TOC 16001) | MoP Classic (TOC 50504) |
 |---|---|---|
-| `SAY` | **4** (rejected) | no |
-| `YELL` | **4** (rejected) | no |
-| `WHISPER` (to self) | 0 | **yes** |
-| custom `CHANNEL` | 0 | **yes** |
+| `SAY` | **4** rejected | **0** delivered |
+| `YELL` | **4** rejected | **0** delivered |
+| `WHISPER` (to self) | 0 delivered | 0 delivered |
+| custom `CHANNEL` | **0** delivered | **4** rejected |
 
-`0` is success; the non-zero code is a chat-type rejection. Retail restricted
-addon messages over proximity chat years ago and this build inherits it.
+`0` is success, non-zero a chat-type rejection. **The two clients are exact
+mirror images**, which is why the broadcast channel is a setting
+(`/deed channel`) with runtime fallback rather than a hardcoded value.
 
-**There is therefore no range-limited transport available at all.** Every
-remaining option is membership-based, not distance-based:
+Consequences for design: on **MoP Classic the original proximity "nearby
+rivals" mechanic is available** (`YELL` works). On **WoW-Forever it is not**,
+and the ladder is necessarily server-wide over a custom channel. The same
+addon therefore has a different competitive radius per client, and that is a
+gameplay difference, not an implementation detail — so a fallback announces
+itself in chat instead of switching silently.
+
+On WoW-Forever specifically, every available option is membership-based rather
+than distance-based:
 
 | Channel | Reaches | Fits |
 |---|---|---|

@@ -66,11 +66,20 @@ chat are rejected on WoW-Forever (measured — `docs/rival-layer.md` §3), so
 there is no range-limited transport. Everyone running the addon who has joined
 the shared channel hears every published claim.
 
-Which chat types carry addon messages is a **per-client** fact, so the
-broadcast channel is a setting rather than a constant. Run `/deed commtest` on
-a new client to see what it accepts, then `/deed channel GUILD` (or `CHANNEL`,
-`PARTY`, `RAID`, …) to switch. On MoP Classic, `GUILD` is the safest bet if a
-custom channel turns out to be refused.
+…**on WoW-Forever.** On MoP Classic it's the opposite: `SAY`/`YELL` work and a
+custom channel is refused, so there the ladder *is* proximity-based and the
+original "nearby rivals" design works as intended.
+
+| Channel | WoW-Forever | MoP Classic |
+|---|---|---|
+| `SAY` / `YELL` | rejected | ✅ works |
+| custom `CHANNEL` | ✅ works | rejected |
+
+The addon detects a refusal, falls back down `CHANNEL → YELL → GUILD → SAY`,
+remembers the result, and **tells you in chat** — because the fallbacks differ
+in *reach*, not just plumbing, so your ladder's radius changes with them.
+Override any time with `/deed channel <type>`, and `/deed commtest` shows what
+a given client accepts.
 
 On login you will see the client's **Code of Conduct notice** in chat. That is
 the game reacting to joining a channel, not an addon error.

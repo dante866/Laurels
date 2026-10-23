@@ -40,8 +40,49 @@ Comm.DEFAULT_CHANNEL = "CHANNEL"
 -- value, and adapting to a new client is a chat command instead of a patch.
 Comm.CHANNELS = { "CHANNEL", "GUILD", "PARTY", "RAID", "SAY", "YELL" }
 
+-- Order to fall back through when a client refuses the configured channel.
+-- Measured: WoW-Forever carries CHANNEL and refuses SAY/YELL; MoP Classic is
+-- the exact inverse. These differ in REACH, not just plumbing -- CHANNEL is
+-- server-wide, YELL/SAY are proximity, GUILD is your guild -- so a fallback
+-- changes who can contest your titles, and is announced rather than silent.
+Comm.CHANNEL_PRIORITY = { "CHANNEL", "YELL", "GUILD", "SAY" }
+
+Comm.CHANNEL_REACH = {
+    CHANNEL = "server-wide",
+    YELL    = "nearby players only",
+    SAY     = "very nearby players only",
+    GUILD   = "your guild",
+    PARTY   = "your party",
+    RAID    = "your raid",
+}
+
 function Comm:BroadcastChannel()
     return (ns.db and ns.db.commChannel) or self.DEFAULT_CHANNEL
+end
+
+-- A client refused `channel`. Step to the next candidate it hasn't already
+-- rejected, remember it, and say what changed about the ladder's reach.
+function Comm:FallBackFrom(channel)
+    self._refused = self._refused or {}
+    self._refused[channel] = true
+
+    for _, candidate in ipairs(self.CHANNEL_PRIORITY) do
+        if not self._refused[candidate] then
+            if ns.db then ns.db.commChannel = candidate end
+            ns:Print(("|cffff8800%s is not allowed on this client.|r Switching to "
+                .. "|cffffd100%s|r \226\128\148 rivals are now %s."):format(
+                channel, candidate,
+                self.CHANNEL_REACH[candidate] or "reachable on that channel"))
+            if candidate == "CHANNEL" and JoinTemporaryChannel then
+                JoinTemporaryChannel(self.CHANNEL_NAME)
+            end
+            return candidate
+        end
+    end
+
+    ns:Print("|cffff8800No usable broadcast channel on this client.|r "
+        .. "Rival claims can't be sent. Try /deed channel <type> manually.")
+    return nil
 end
 
 -- Outbound rate limit. Every client hears every claim on a server-wide
@@ -173,13 +214,18 @@ function Comm:InitTransport()
     self.myGuid = UnitGUID and UnitGUID("player")
 
     local queue = {}
+    -- Returns the client's result code: 0 is success, non-zero a refusal
+    -- (a rejected chat type reports 4). nil means we couldn't tell.
     local function rawSend(prefix, body, channel, target)
         if ChatThrottleLib then
             ChatThrottleLib:SendAddonMessage("NORMAL", prefix, body, channel, target)
-            return
+            return nil
         end
         local send = Comm:SendFn()
-        if send then send(prefix, body, channel, target) end
+        if not send then return nil end
+        local ok, res = pcall(send, prefix, body, channel, target)
+        if not ok then return nil end
+        return tonumber(res)
     end
 
     local draining = false
@@ -197,7 +243,17 @@ function Comm:InitTransport()
                 return
             end
         end
-        rawSend(item.prefix, item.body, channel, target)
+        local res = rawSend(item.prefix, item.body, channel, target)
+        if res and res ~= 0 and not item.retried then
+            -- The client refused this chat type. Move to one it allows and
+            -- resend this message there rather than dropping it. Marked so a
+            -- message can't bounce around the priority list indefinitely.
+            local nextChannel = Comm:FallBackFrom(channel)
+            if nextChannel then
+                item.channel, item.target, item.retried = nextChannel, nil, true
+                table.insert(queue, 1, item)
+            end
+        end
         ns.After(Comm.SEND_INTERVAL, drain)
     end
 

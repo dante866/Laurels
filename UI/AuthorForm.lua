@@ -60,20 +60,13 @@ local function rootMapID()
     return id
 end
 
--- Every zone the client knows about, alphabetically. Returns an empty list on
--- any client that won't answer, which is fine -- the dropdown still offers
--- "Any zone" and "Current zone", so zone scoping never becomes unreachable.
-local function collectZones()
-    local out = {}
-    if not (C_Map and C_Map.GetMapChildrenInfo) then return out end
-    local root = rootMapID()
-    if not root then return out end
+local MAPTYPE_CONTINENT = (Enum and Enum.UIMapType and Enum.UIMapType.Continent) or 2
+local MAPTYPE_ZONE      = (Enum and Enum.UIMapType and Enum.UIMapType.Zone) or 3
 
-    local ZONE = (Enum and Enum.UIMapType and Enum.UIMapType.Zone) or 3
-    local ok, kids = pcall(C_Map.GetMapChildrenInfo, root, ZONE, true)
+local function zoneListFrom(mapID)
+    local out, seen = {}, {}
+    local ok, kids = pcall(C_Map.GetMapChildrenInfo, mapID, MAPTYPE_ZONE, true)
     if not ok or type(kids) ~= "table" then return out end
-
-    local seen = {}
     for _, info in ipairs(kids) do
         if info.name and info.name ~= "" and not seen[info.name] then
             seen[info.name] = true
@@ -82,6 +75,38 @@ local function collectZones()
     end
     table.sort(out, function(a, b) return a.zone < b.zone end)
     return out
+end
+
+-- Zones grouped by continent. A flat list of every zone runs off the bottom of
+-- the screen -- there are ~80 of them -- so the dropdown nests one level, which
+-- also matches how players think about where a zone is. Returns an empty tree
+-- on any client that won't answer; the caller falls back to a flat list, and
+-- "Any zone" / "Current zone" are always offered regardless.
+local function collectZoneTree()
+    local tree = {}
+    if not (C_Map and C_Map.GetMapChildrenInfo) then return tree end
+    local root = rootMapID()
+    if not root then return tree end
+
+    local ok, continents = pcall(C_Map.GetMapChildrenInfo, root, MAPTYPE_CONTINENT, true)
+    if not ok or type(continents) ~= "table" then return tree end
+
+    for _, cont in ipairs(continents) do
+        local zones = zoneListFrom(cont.mapID)
+        if #zones > 0 then
+            table.insert(tree, { name = cont.name or "?", zones = zones })
+        end
+    end
+    table.sort(tree, function(a, b) return a.name < b.name end)
+    return tree
+end
+
+-- Flat fallback for a client that reports zones but no continents.
+local function collectZones()
+    if not (C_Map and C_Map.GetMapChildrenInfo) then return {} end
+    local root = rootMapID()
+    if not root then return {} end
+    return zoneListFrom(root)
 end
 
 local function parseNpcIDs(str)
@@ -159,34 +184,64 @@ function AuthorForm:GetFrame()
         CloseDropDownMenus()
     end
 
-    UIDropDownMenu_Initialize(dd, function()
-        local info = UIDropDownMenu_CreateInfo()
-        info.text = ANY_ZONE
-        info.notCheckable = true
-        info.func = function() chooseZone(nil, ANY_ZONE) end
-        UIDropDownMenu_AddButton(info)
+    UIDropDownMenu_Initialize(dd, function(_, level, menuList)
+        level = level or 1
 
-        local here, hereID = currentZone()
-        if here then
-            info = UIDropDownMenu_CreateInfo()
-            info.text = ("Current zone \226\128\148 %s"):format(here)
+        if level == 1 then
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = ANY_ZONE
             info.notCheckable = true
-            -- Resolved now rather than at save time, so the deed means the
-            -- zone you picked it in, not wherever you happen to be on Save.
-            info.func = function()
-                chooseZone({ zone = here, zoneID = hereID }, here)
-            end
-            UIDropDownMenu_AddButton(info)
-        end
+            info.func = function() chooseZone(nil, ANY_ZONE) end
+            UIDropDownMenu_AddButton(info, level)
 
-        for _, z in ipairs(f.zoneList or {}) do
-            local entry = UIDropDownMenu_CreateInfo()
-            entry.text = z.zone
-            entry.notCheckable = true
-            entry.func = function() chooseZone(z, z.zone) end
-            UIDropDownMenu_AddButton(entry)
+            local here, hereID = currentZone()
+            if here then
+                info = UIDropDownMenu_CreateInfo()
+                info.text = ("Current zone \226\128\148 %s"):format(here)
+                info.notCheckable = true
+                -- Resolved now rather than at save time, so the deed means the
+                -- zone you picked it in, not wherever you are when you Save.
+                info.func = function()
+                    chooseZone({ zone = here, zoneID = hereID }, here)
+                end
+                UIDropDownMenu_AddButton(info, level)
+            end
+
+            -- One submenu per continent, so no single list can outgrow the
+            -- screen the way a flat ~80-entry list does.
+            for i, cont in ipairs(f.zoneTree or {}) do
+                info = UIDropDownMenu_CreateInfo()
+                info.text = cont.name
+                info.notCheckable = true
+                info.hasArrow = true
+                info.keepShownOnClick = true
+                info.menuList = i
+                UIDropDownMenu_AddButton(info, level)
+            end
+
+            -- Only reached on a client that reports zones but no continents.
+            for _, z in ipairs(f.zoneList or {}) do
+                info = UIDropDownMenu_CreateInfo()
+                info.text = z.zone
+                info.notCheckable = true
+                info.func = function() chooseZone(z, z.zone) end
+                UIDropDownMenu_AddButton(info, level)
+            end
+
+        else
+            local cont = (f.zoneTree or {})[menuList]
+            if not cont then return end
+            for _, z in ipairs(cont.zones) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = z.zone
+                info.notCheckable = true
+                info.func = function() chooseZone(z, z.zone) end
+                UIDropDownMenu_AddButton(info, level)
+            end
         end
     end)
+    -- Backstop: even a single continent's list scrolls rather than overflowing.
+    if UIDropDownMenu_SetMaxHeight then UIDropDownMenu_SetMaxHeight(dd, 380) end
     UIDropDownMenu_SetWidth(dd, 210)
     UIDropDownMenu_SetText(dd, ANY_ZONE)
 
@@ -239,7 +294,10 @@ function AuthorForm:Open()
     local f = self:GetFrame()
     -- Rebuilt per open: the zone list needs a loaded map tree, which isn't
     -- guaranteed at addon load, and "Current zone" should follow the player.
-    f.zoneList = collectZones()
+    f.zoneTree = collectZoneTree()
+    -- Flat list only as a fallback, so a client reporting no continents still
+    -- gets a browsable list instead of nothing.
+    f.zoneList = (#f.zoneTree == 0) and collectZones() or {}
     self:Clear()
     f:Show()
     f.nameEdit:SetFocus()
