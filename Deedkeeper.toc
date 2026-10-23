@@ -12,7 +12,11 @@
 # in-game and set this number to what it prints.
 
 Core.lua
+Diagnostics.lua
 Tracking\Engine.lua
 Tracking\Sources\KillSource.lua
+Rival\Ladder.lua
+Rival\Comm.lua
+Rival\Rival.lua
 UI\MiniPanel.lua
 UI\AuthorForm.lua

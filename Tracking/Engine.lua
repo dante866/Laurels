@@ -114,6 +114,11 @@ function Engine:Increment(tracker, amount)
     end
 
     if ns.UI and ns.UI.Refresh then ns.UI:Refresh() end
+
+    -- Rival layer: record/broadcast our own claim (no-op for unpublished deeds).
+    if ns.Rival and ns.Rival.OnLocalProgress then
+        ns.Rival:OnLocalProgress(tracker)
+    end
 end
 
 -- --- authoring API --------------------------------------------------------

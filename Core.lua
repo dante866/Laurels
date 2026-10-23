@@ -64,6 +64,7 @@ local function initModules()
     ns.Engine:Init()
     ns.Engine:RegisterSource("kill", ns.KillSource)
     if ns.UI and ns.UI.Init then ns.UI:Init() end
+    if ns.Rival and ns.Rival.Init then ns.Rival:Init() end
     ns:Print(("v%s loaded. /deed to open the panel, /deed help for commands.")
         :format(ns.version))
 end
@@ -104,6 +105,48 @@ SlashCmdList.DEEDKEEPER = function(msg)
             ns:Print("usage: /deed delete <trackerId>")
         end
 
+    elseif cmd == "publish" then
+        local t = ns.Engine:GetTracker(rest)
+        if not t then
+            ns:Print("no tracker with id:", rest ~= "" and rest or "(none given)")
+        else
+            t.published = true
+            t.uuid = t.uuid or ns.genUUID()
+            t.origin = t.origin or ns.Rival:MyName()
+            ns:Print(("published '%s' (shared id %s). Nearby addon users can now contest it.")
+                :format(t.name, t.uuid))
+            ns.Rival:ForceBroadcast(t)
+        end
+
+    elseif cmd == "unpublish" then
+        local t = ns.Engine:GetTracker(rest)
+        if t then
+            t.published = false
+            ns:Print("unpublished:", t.name)
+        else
+            ns:Print("no tracker with id:", rest ~= "" and rest or "(none given)")
+        end
+
+    elseif cmd == "whoami" then
+        if ns.Diag then ns.Diag:WhoAmI() end
+
+    elseif cmd == "rivals" then
+        local t = ns.Engine:GetTracker(rest)
+        if not t then
+            ns:Print("usage: /deed rivals <trackerId>")
+        else
+            local standings = ns.Ladder:GetStandings(ns.Rival:KeyFor(t))
+            if #standings == 0 then
+                ns:Print("no claims heard yet for:", t.name)
+            else
+                ns:Print(("Rivals for %s:"):format(t.name))
+                for i, e in ipairs(standings) do
+                    ns:Print(("  %d. %s \226\128\148 %d%s"):format(
+                        i, e.name, e.count, (i == 1) and "  (holder)" or ""))
+                end
+            end
+        end
+
     elseif cmd == "list" then
         ns:Print("Trackers:")
         for _, t in ipairs(ns.db.trackers) do
@@ -142,6 +185,10 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed list            list trackers + progress")
         ns:Print("  /deed delete <id>     delete a tracker")
         ns:Print("  /deed reset <id>      reset a tracker's progress")
+        ns:Print("  /deed publish <id>    publish a deed so others can contest it")
+        ns:Print("  /deed unpublish <id>  stop broadcasting a deed")
+        ns:Print("  /deed rivals <id>     show the leaderboard for a deed")
+        ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")
         ns:Print("  /deed test <n> <name> simulate n kills of <name> (for testing)")
 
     else

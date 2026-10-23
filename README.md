@@ -23,19 +23,33 @@ to match, or the addon shows as out of date.
 - [x] Per-character progress + account-wide definitions (SavedVariables)
 - [x] Minimal draggable panel + slash commands
 
-**v2 — in-game authoring (current build, 0.2.0)**
+**v2 — in-game authoring**
 - [x] "New Deed" form: name, match (name-contains / NPC IDs), up to 5 title tiers
 - [x] Per-row delete button; `/deed new`, `/deed delete <id>` commands
-- [x] Headless engine tests (`tools/test_engine.lua`, 15 checks)
-- [ ] Next: rival/steal layer (auto-broadcast nearby, see below)
+
+**v3 — rival / steal layer (current build)**
+- [x] M1 Comm bus (`Rival/Comm.lua`) — encode/decode/dispatch over a swappable transport
+- [x] M2 Ladder + holder resolution (`Rival/Ladder.lua`) — deterministic steal, rate cap
+- [x] M3 Wire-up (`Rival/Rival.lua`) — publish a deed, auto-broadcast on tier change,
+      inbound claims update the ladder and fire "you took / lost the title"
+- [x] `/deed publish|unpublish|rivals <id>` commands
+- [ ] M4 published-deed definition sync (DEFPUB adopt) — currently two clients must
+      share the same `uuid`; adoption makes that automatic
+- [ ] M5 holder/rank in the panel UI + steal toasts; vendor ChatThrottleLib
+
+Known limitations (by design, see `docs/rival-layer.md` §5):
+- The rate cap only catches *acceleration* of a known rival; a brand-new contact's
+  first absolute count can't be sanity-checked (no baseline). Social-trust covers this.
+- Claimants are keyed by chat sender name; connected-realm name suffixes may split a
+  player into two entries until M4 normalizes identity.
 
 ### Developing
 
 Syntax-check every file (LuaJIT = Lua 5.1, matches WoW):
 `powershell -ExecutionPolicy Bypass -File tools\check.ps1`
 
-Run the engine logic tests:
-`luajit tools\test_engine.lua`  (from the addon root)
+Run all headless test suites (from the addon root):
+`luajit tools\test_engine.lua` · `test_ladder.lua` · `test_comm.lua` · `test_rival.lua`
 
 ## Install
 
