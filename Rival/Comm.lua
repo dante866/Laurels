@@ -56,8 +56,24 @@ Comm.CHANNEL_REACH = {
     RAID    = "your raid",
 }
 
+function Comm:IsValidChannel(name)
+    for _, c in ipairs(self.CHANNELS) do
+        if c == name then return true end
+    end
+    return false
+end
+
+-- Precedence: what the player chose, then what this client's .toc declares,
+-- then the built-in default. A bad or absent X-BroadcastChannel just falls
+-- through rather than breaking the transport.
 function Comm:BroadcastChannel()
-    return (ns.db and ns.db.commChannel) or self.DEFAULT_CHANNEL
+    local chosen = ns.db and ns.db.commChannel
+    if chosen and self:IsValidChannel(chosen) then return chosen end
+
+    local fromToc = ns.tocChannel and string.upper(ns.tocChannel)
+    if fromToc and self:IsValidChannel(fromToc) then return fromToc end
+
+    return self.DEFAULT_CHANNEL
 end
 
 -- A client refused `channel`. Step to the next candidate it hasn't already

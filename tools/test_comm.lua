@@ -81,5 +81,22 @@ Comm:HandleRaw(captured, "Me", "CHANNEL")
 check("dispatched handler saw count 42", recvCount == 42)
 check("dispatched handler saw sender", recvSender == "Me")
 
+-- Broadcast channel precedence: the player's choice wins, then whatever this
+-- client's .toc declares, then the built-in default. Garbage in either slot
+-- must fall through rather than break the transport.
+check("falls back to the default", Comm:BroadcastChannel() == "CHANNEL")
+ns.tocChannel = "YELL"
+check("a .toc declaration is honoured", Comm:BroadcastChannel() == "YELL")
+ns.tocChannel = "yell"
+check(".toc value is case-insensitive", Comm:BroadcastChannel() == "YELL")
+ns.tocChannel = "NONSENSE"
+check("an invalid .toc value falls through", Comm:BroadcastChannel() == "CHANNEL")
+ns.tocChannel = "YELL"
+ns.db = { commChannel = "GUILD" }
+check("the player's choice beats the .toc", Comm:BroadcastChannel() == "GUILD")
+ns.db.commChannel = "NOPE"
+check("an invalid saved choice falls through", Comm:BroadcastChannel() == "YELL")
+ns.db, ns.tocChannel = nil, nil
+
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

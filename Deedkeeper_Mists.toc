@@ -6,6 +6,13 @@
 ## SavedVariables: DeedkeeperDB
 ## SavedVariablesPerCharacter: DeedkeeperCharDB
 
+# Measured: this client carries SAY/YELL and refuses a custom CHANNEL, the
+# exact inverse of WoW-Forever. YELL is therefore the right default here, and
+# it restores the proximity "nearby rivals" design. Declaring it per-.toc beats
+# sniffing the client at runtime. /deed channel overrides it; the transport
+# also falls back on its own if this turns out to be wrong.
+## X-BroadcastChannel: YELL
+
 # Mists of Pandaria Classic (live Blizzard realms).
 #
 # A client picks the .toc matching its flavour and falls back to the plain

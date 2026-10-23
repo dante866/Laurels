@@ -4,6 +4,11 @@ ns.name = addonName
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 ns.version = (GetMeta and GetMeta(addonName, "Version")) or "0.1.0"
 
+-- Which chat type carries addon messages differs per client, and each .toc is
+-- already client-specific, so it declares its own default rather than the
+-- addon sniffing at runtime. Validated and applied in Comm:BroadcastChannel.
+ns.tocChannel = GetMeta and GetMeta(addonName, "X-BroadcastChannel")
+
 -- ---------------------------------------------------------------------------
 -- Utilities
 -- ---------------------------------------------------------------------------
@@ -176,11 +181,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
                 table.concat(ns.Comm.CHANNELS, "|") .. ">")
             ns:Print("  /deed commtest shows which ones this client accepts.")
         else
-            local valid = false
-            for _, c in ipairs(ns.Comm.CHANNELS) do
-                if c == want then valid = true break end
-            end
-            if not valid then
+            if not ns.Comm:IsValidChannel(want) then
                 ns:Print("not a channel I can use:", want)
                 ns:Print("  try one of: " .. table.concat(ns.Comm.CHANNELS, ", "))
             else

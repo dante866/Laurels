@@ -6,6 +6,11 @@
 ## SavedVariables: DeedkeeperDB
 ## SavedVariablesPerCharacter: DeedkeeperCharDB
 
+# Measured: this client refuses SAY/YELL and carries a custom CHANNEL, so the
+# ladder here is server-wide rather than proximity-based. /deed channel
+# overrides it; the transport also falls back on its own if this is wrong.
+## X-BroadcastChannel: CHANNEL
+
 # NOTE: ## Interface above is the client's TOC version, NOT its build number.
 # WoW-Forever 1.60.1 (build 70532, Oct 20 2026) reports TOC version 16001.
 # To re-check after a client patch, run in-game:

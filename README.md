@@ -21,18 +21,17 @@ flavour and falls back to the plain one, so these coexist:
 | WoW-Forever 1.60.1 (build 70532) | `Deedkeeper.toc` | `16001` | ✅ measured in game |
 | Mists of Pandaria Classic | `Deedkeeper_Mists.toc` | `50504` | ✅ measured in game |
 
-After a client patch, re-check with `/run print(GetBuildInfo())` and use the
-**last** value — not the build number. If the addon ever shows as out of date,
-tick "Load out of date AddOns" at character select, which loads it regardless.
+Active development happens on **MoP Classic**; WoW-Forever is in beta until
+early November. Note this is MoP *Classic*, on the modern client engine — not
+original 5.4, which has no `C_ChatInfo` and would need real porting.
 
-Note this is *MoP Classic*, which runs on the modern client engine — not
-original 5.4, which has no `C_ChatInfo` at all and would need real porting.
-
-⚠️ After a client patch, re-check with `/run print(GetBuildInfo())` — it prints
-*version, build, date, tocversion* and the **last** value is the one `## Interface`
-needs. Don't use the build number: this client's TOC version (`16001`) and build
-(`70532`) are nowhere near each other, and mixing them up makes the addon show as
-incompatible and silently not load (no error, slash commands just don't register).
+⚠️ After a client patch, re-check with `/run print(GetBuildInfo())`. It prints
+*version, build, date, tocversion*, and the **last** value is what `## Interface`
+needs — **not the build number**. On WoW-Forever those two are nowhere near each
+other (`16001` vs `70532`), and mixing them up makes the addon show as
+incompatible and silently not load: no error, slash commands just don't register.
+If that happens, tick "Load out of date AddOns" at character select to load it
+regardless while you correct the number.
 
 ## Status
 
@@ -55,34 +54,41 @@ incompatible and silently not load (no error, slash commands just don't register
 - [x] `/deed publish|unpublish|rivals <id>` commands
 - [x] **GUID identity** — ladder keyed on player GUID, names display-only; fixes
       same-name collisions and a client logging itself as its own rival
-- [x] **Channel transport** — `SAY`/`YELL` are refused by this client, so the
-      ladder runs on one shared hidden channel, with built-in send throttling
+- [x] **Adaptive transport** — the broadcast channel is negotiated per client
+      rather than hardcoded, with built-in send throttling
 - [ ] M4 published-deed definition sync (DEFPUB adopt) — currently two clients must
       share the same `uuid`; adoption makes that automatic
 - [ ] M5 holder/rank in the panel UI + steal toasts
 
-⚠️ **The ladder is server-wide, not nearby.** Addon messages over proximity
-chat are rejected on WoW-Forever (measured — `docs/rival-layer.md` §3), so
-there is no range-limited transport. Everyone running the addon who has joined
-the shared channel hears every published claim.
+⚠️ **Never tested between two real clients.** Every test is headless against a
+fake bus. Messages provably leave and your own come back, but no other
+player's client has yet received, decoded and announced a claim — which is the
+entire point of v3. M4 and M5 both build on that assumption.
 
-…**on WoW-Forever.** On MoP Classic it's the opposite: `SAY`/`YELL` work and a
-custom channel is refused, so there the ladder *is* proximity-based and the
-original "nearby rivals" design works as intended.
+### How far your ladder reaches
 
-| Channel | WoW-Forever | MoP Classic |
+Which chat types carry addon messages is a **per-client fact**, and the two
+targets are exact opposites:
+
+| Channel | MoP Classic | WoW-Forever |
 |---|---|---|
-| `SAY` / `YELL` | rejected | ✅ works |
-| custom `CHANNEL` | ✅ works | rejected |
+| `SAY` / `YELL` | ✅ works | rejected |
+| custom `CHANNEL` | rejected | ✅ works |
 
-The addon detects a refusal, falls back down `CHANNEL → YELL → GUILD → SAY`,
-remembers the result, and **tells you in chat** — because the fallbacks differ
-in *reach*, not just plumbing, so your ladder's radius changes with them.
-Override any time with `/deed channel <type>`, and `/deed commtest` shows what
-a given client accepts.
+So on **MoP Classic the ladder is proximity-based** and the original "nearby
+rivals" design works as intended. On **WoW-Forever it can't be** — there is no
+range-limited transport, so the ladder is server-wide over a shared hidden
+channel and everyone with the addon hears every published claim.
 
-On login you will see the client's **Code of Conduct notice** in chat. That is
-the game reacting to joining a channel, not an addon error.
+Each `.toc` declares its own default via `X-BroadcastChannel`. If a client
+refuses it anyway, the addon falls back down `CHANNEL → YELL → GUILD → SAY`,
+remembers the result, and **tells you in chat** — the fallbacks differ in
+*reach*, not just plumbing, so your ladder's radius changes with them.
+Override with `/deed channel <type>`; `/deed commtest` shows what a client
+accepts.
+
+On WoW-Forever you'll see the client's **Code of Conduct notice** on login.
+That's the game reacting to joining a channel, not an addon error.
 
 Known limitations (by design, see `docs/rival-layer.md` §5):
 - The rate cap only catches *acceleration* of a known rival; a brand-new contact's
@@ -100,9 +106,12 @@ Run all headless test suites (from the addon root):
 
 ## Install
 
-Copy the `Deedkeeper` folder into your client's AddOns directory, e.g.
-`World of Warcraft\_retail_\Interface\AddOns\Deedkeeper\`
-(WoW-Forever may use its own install folder — check its launcher).
+Copy the `Deedkeeper` folder into your client's AddOns directory:
+
+- **MoP Classic** — `World of Warcraft\_classic_\Interface\AddOns\Deedkeeper\`
+- **WoW-Forever** — may use its own install folder; check its launcher.
+
+Both `.toc` files ship together and the client picks the right one.
 
 ## Try it
 
