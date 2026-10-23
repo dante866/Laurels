@@ -178,10 +178,37 @@ Still open:
   would need manual alt-grouping. Currently per-character.
 - **Zone filtering** — restore a "nearby" display filter (§3)? Cosmetic.
 
-## 10. Player identity on this client — **measured**
+## 10. Player identity — **measured on both clients**
 
-WoW-Forever uses two-part character names, and the name APIs report them in a
-way that is actively misleading. From `/deed whoami`:
+The two clients disagree about what a character name *is*, and neither one
+can be assumed from the other.
+
+| | WoW-Forever | MoP Classic |
+|---|---|---|
+| `UnitName("player")` | `Indira`, `Resthaerl` | `Ija`, *(realm)* |
+| 2nd return is really | a **surname** | a **realm** |
+| `GetUnitName(p,false)` | `Indira Resthaerl` | `Ija` |
+| `CHAT_MSG_ADDON` sender | `Indira Resthaerl` (space) | `Ija-Pagle` (hyphen) |
+
+MoP Classic is ordinary WoW: `Name-Realm`, hyphenated, realm in the realm
+slot. WoW-Forever is the odd one, with a surname occupying the realm slot.
+
+**This is the case for GUID keying, not against it.** The same code is correct
+on both without a branch: identity is the GUID, which is unambiguous
+everywhere, and `GetUnitName("player", false)` happens to return the right
+*display* string on each — the full two-part name on WoW-Forever, the bare
+character name on MoP Classic. Had identity been keyed on names, each client
+would have needed its own special case, and `sender` would have had to be
+parsed differently (space vs hyphen) per client.
+
+Known display limitation: on connected realms two players can share a
+character name, and `name` in the payload carries no realm. They stay separate
+ladder entries because GUIDs differ, but render with identical labels. Append
+the realm from `sender` if that ever shows up in practice.
+
+### 10.1 The WoW-Forever measurement in full
+
+From `/deed whoami`:
 
 ```
 UnitName("player")          = "Indira", "Resthaerl"

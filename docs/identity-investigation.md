@@ -67,6 +67,21 @@ payload makes the protocol independent of `sender`'s format entirely.
 - `MyName()` now uses `GetUnitName("player", false)` for the full two-part
   name, as a display label only.
 
+## Confirmed again on a second client
+
+MoP Classic (TOC 50504) reports identity the ordinary WoW way — `sender` is
+`Ija-Pagle`, hyphenated `Name-Realm`, with the realm genuinely in the realm
+slot. WoW-Forever's surname-in-the-realm-slot is the anomaly, not the norm.
+
+The design survived the second client **unchanged**, which is the useful part:
+
+- `UnitGUID` is unambiguous on both, so the ladder keying needed no branch.
+- `GetUnitName("player", false)` returns the right display string on each —
+  `Indira Resthaerl` on WoW-Forever, `Ija` on MoP Classic.
+- `sender` is never parsed, so the space-vs-hyphen difference is irrelevant.
+
+Name keying would have needed per-client special cases in all three places.
+
 ## Still open
 
 1. **Per-character or per-account?** The GUID is per-character and exposes no
