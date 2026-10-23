@@ -164,6 +164,32 @@ SlashCmdList.DEEDKEEPER = function(msg)
             ns:Print("no tracker with id:", rest ~= "" and rest or "(none given)")
         end
 
+    elseif cmd == "channel" then
+        -- Which chat types carry addon messages differs per client, so this is
+        -- a setting rather than a constant. /deed commtest tells you which
+        -- ones this client actually accepts.
+        local want = rest:gsub("^%s+", ""):gsub("%s+$", ""):upper()
+        if want == "" then
+            ns:Print(("broadcasting on: |cffffd100%s|r"):format(
+                ns.Comm:BroadcastChannel()))
+            ns:Print("  change with /deed channel <" ..
+                table.concat(ns.Comm.CHANNELS, "|") .. ">")
+            ns:Print("  /deed commtest shows which ones this client accepts.")
+        else
+            local valid = false
+            for _, c in ipairs(ns.Comm.CHANNELS) do
+                if c == want then valid = true break end
+            end
+            if not valid then
+                ns:Print("not a channel I can use:", want)
+                ns:Print("  try one of: " .. table.concat(ns.Comm.CHANNELS, ", "))
+            else
+                ns.db.commChannel = want
+                ns:Print(("broadcasting on |cffffd100%s|r from now on. "
+                    .. "/reload to re-register."):format(want))
+            end
+        end
+
     elseif cmd == "whoami" then
         if ns.Diag then ns.Diag:WhoAmI() end
 
@@ -253,6 +279,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed rivals <id>     show the leaderboard for a deed")
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")
         ns:Print("  /deed commtest        test whether addon messages work (diagnostic)")
+        ns:Print("  /deed channel [type]  show or set the broadcast channel")
         ns:Print("  /deed test <n> <name> simulate n kills of <name> (for testing)")
         ns:Print(" ")
         ns:Print("|cffffd100Making a deed|r \226\128\148 two things: what to count, and the")

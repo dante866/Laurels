@@ -10,9 +10,24 @@ tracks your progress and awards the title. A later version lets other addon user
 > server controls real titles; an addon can't grant them. Deedkeeper stores and
 > displays them itself, and (v2) shares them peer-to-peer with other addon users.
 
-Target client: **WoW-Forever (retail-based API)** — version `1.60.1`, build `70532`
-(Oct 20 2026), which reports **TOC version `16001`**. That is the value in
-`## Interface` in `Deedkeeper.toc`.
+## Supported clients
+
+Both are **modern-engine** clients (`C_ChatInfo`, `C_Timer`, `C_Map` all
+present), so one codebase serves both. A client loads the `.toc` matching its
+flavour and falls back to the plain one, so these coexist:
+
+| Client | `.toc` | `## Interface` | Verified? |
+|---|---|---|---|
+| WoW-Forever 1.60.1 (build 70532) | `Deedkeeper.toc` | `16001` | ✅ measured in game |
+| Mists of Pandaria Classic | `Deedkeeper_Mists.toc` | `50500` | ⚠️ **unverified guess** |
+
+⚠️ The MoP Classic number is an educated guess at patch 5.5.x and has **not**
+been checked on a live client. Confirm with `/run print(GetBuildInfo())` and
+use the **last** value — not the build number. Until then, tick "Load out of
+date AddOns" at character select, which loads it regardless.
+
+Note this is *MoP Classic*, which runs on the modern client engine — not
+original 5.4, which has no `C_ChatInfo` at all and would need real porting.
 
 ⚠️ After a client patch, re-check with `/run print(GetBuildInfo())` — it prints
 *version, build, date, tocversion* and the **last** value is the one `## Interface`
@@ -48,9 +63,15 @@ incompatible and silently not load (no error, slash commands just don't register
 - [ ] M5 holder/rank in the panel UI + steal toasts
 
 ⚠️ **The ladder is server-wide, not nearby.** Addon messages over proximity
-chat are rejected on this client (measured — `docs/rival-layer.md` §3), so
+chat are rejected on WoW-Forever (measured — `docs/rival-layer.md` §3), so
 there is no range-limited transport. Everyone running the addon who has joined
 the shared channel hears every published claim.
+
+Which chat types carry addon messages is a **per-client** fact, so the
+broadcast channel is a setting rather than a constant. Run `/deed commtest` on
+a new client to see what it accepts, then `/deed channel GUILD` (or `CHANNEL`,
+`PARTY`, `RAID`, …) to switch. On MoP Classic, `GUILD` is the safest bet if a
+custom channel turns out to be refused.
 
 On login you will see the client's **Code of Conduct notice** in chat. That is
 the game reacting to joining a channel, not an addon error.

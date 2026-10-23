@@ -34,6 +34,16 @@ Comm.handlers = {}
 Comm.CHANNEL_NAME = "Deedkeeper"
 Comm.DEFAULT_CHANNEL = "CHANNEL"
 
+-- Which chat types a client will carry addon messages over is a per-client
+-- fact, not a constant: WoW-Forever refuses SAY and YELL outright. So the
+-- broadcast channel is a setting (/deed channel) rather than a hardcoded
+-- value, and adapting to a new client is a chat command instead of a patch.
+Comm.CHANNELS = { "CHANNEL", "GUILD", "PARTY", "RAID", "SAY", "YELL" }
+
+function Comm:BroadcastChannel()
+    return (ns.db and ns.db.commChannel) or self.DEFAULT_CHANNEL
+end
+
 -- Outbound rate limit. Every client hears every claim on a server-wide
 -- channel, and flooding the addon-message pipe disconnects you, so sends are
 -- queued and drained at a fixed rate rather than fired immediately.
@@ -127,7 +137,19 @@ function Comm:Send(msg, channel, target)
     if not body or not self.transport then return end
     -- Channel resolution is the transport's job, so this stays pure and the
     -- headless tests can swap in a fake that ignores `channel` entirely.
-    self.transport:Send(self.PREFIX, body, channel or self.DEFAULT_CHANNEL, target)
+    self.transport:Send(self.PREFIX, body, channel or self:BroadcastChannel(), target)
+end
+
+-- Addon-message API, preferring the modern namespace but falling back to the
+-- globals. Both WoW-Forever and MoP Classic are modern-engine and expose
+-- C_ChatInfo; the globals are cheap insurance for any client that doesn't.
+function Comm:SendFn()
+    return (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
+end
+
+function Comm:RegisterFn()
+    return (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix)
+        or RegisterAddonMessagePrefix
 end
 
 -- Current index of our shared channel, or 0 if we aren't in it yet. Indices
@@ -141,10 +163,10 @@ end
 
 -- WoW-only wiring. Not exercised by headless tests.
 function Comm:InitTransport()
-    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
-        C_ChatInfo.RegisterAddonMessagePrefix(self.PREFIX)
-    end
-    if JoinTemporaryChannel then
+    local register = self:RegisterFn()
+    if register then register(self.PREFIX) end
+    -- Only worth joining if we actually broadcast over a custom channel.
+    if JoinTemporaryChannel and self:BroadcastChannel() == "CHANNEL" then
         JoinTemporaryChannel(self.CHANNEL_NAME)
     end
 
@@ -154,9 +176,10 @@ function Comm:InitTransport()
     local function rawSend(prefix, body, channel, target)
         if ChatThrottleLib then
             ChatThrottleLib:SendAddonMessage("NORMAL", prefix, body, channel, target)
-        elseif C_ChatInfo and C_ChatInfo.SendAddonMessage then
-            C_ChatInfo.SendAddonMessage(prefix, body, channel, target)
+            return
         end
+        local send = Comm:SendFn()
+        if send then send(prefix, body, channel, target) end
     end
 
     local draining = false

@@ -1,0 +1,31 @@
+## Interface: 50500
+## Title: Deedkeeper
+## Notes: Custom RP achievements, titles, and rival challenges.
+## Author: charl
+## Version: 0.2.0
+## SavedVariables: DeedkeeperDB
+## SavedVariablesPerCharacter: DeedkeeperCharDB
+
+# Mists of Pandaria Classic (live Blizzard realms).
+#
+# A client picks the .toc matching its flavour and falls back to the plain
+# Deedkeeper.toc when there is none, so this file and Deedkeeper.toc coexist:
+# MoP Classic reads this one, WoW-Forever reads the other. Keep the file list
+# below in sync with Deedkeeper.toc.
+#
+# ## Interface above is a BEST GUESS at MoP Classic's TOC version (patch 5.5.x
+# -> 50500) and has not been verified on a live client. Confirm in game with:
+#   /run print(GetBuildInfo())
+# and use the LAST value it prints -- NOT the build number. If the addon shows
+# as out of date, tick "Load out of date AddOns" on the character-select
+# AddOns screen, which loads it regardless while you correct this number.
+
+Core.lua
+Diagnostics.lua
+Tracking\Engine.lua
+Tracking\Sources\KillSource.lua
+Rival\Ladder.lua
+Rival\Comm.lua
+Rival\Rival.lua
+UI\MiniPanel.lua
+UI\AuthorForm.lua
