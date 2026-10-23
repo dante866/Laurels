@@ -19,12 +19,11 @@ flavour and falls back to the plain one, so these coexist:
 | Client | `.toc` | `## Interface` | Verified? |
 |---|---|---|---|
 | WoW-Forever 1.60.1 (build 70532) | `Deedkeeper.toc` | `16001` | ✅ measured in game |
-| Mists of Pandaria Classic | `Deedkeeper_Mists.toc` | `50500` | ⚠️ **unverified guess** |
+| Mists of Pandaria Classic | `Deedkeeper_Mists.toc` | `50504` | ✅ measured in game |
 
-⚠️ The MoP Classic number is an educated guess at patch 5.5.x and has **not**
-been checked on a live client. Confirm with `/run print(GetBuildInfo())` and
-use the **last** value — not the build number. Until then, tick "Load out of
-date AddOns" at character select, which loads it regardless.
+After a client patch, re-check with `/run print(GetBuildInfo())` and use the
+**last** value — not the build number. If the addon ever shows as out of date,
+tick "Load out of date AddOns" at character select, which loads it regardless.
 
 Note this is *MoP Classic*, which runs on the modern client engine — not
 original 5.4, which has no `C_ChatInfo` at all and would need real porting.

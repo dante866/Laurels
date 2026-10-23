@@ -1,4 +1,4 @@
-## Interface: 50500
+## Interface: 50504
 ## Title: Deedkeeper
 ## Notes: Custom RP achievements, titles, and rival challenges.
 ## Author: charl
@@ -13,11 +13,11 @@
 # MoP Classic reads this one, WoW-Forever reads the other. Keep the file list
 # below in sync with Deedkeeper.toc.
 #
-# ## Interface above is a BEST GUESS at MoP Classic's TOC version (patch 5.5.x
-# -> 50500) and has not been verified on a live client. Confirm in game with:
+# ## Interface above is VERIFIED: a live MoP Classic client reports TOC
+# version 50504. To re-check after a patch, run in game:
 #   /run print(GetBuildInfo())
-# and use the LAST value it prints -- NOT the build number. If the addon shows
-# as out of date, tick "Load out of date AddOns" on the character-select
+# and use the LAST value it prints -- NOT the build number. If the addon ever
+# shows as out of date, tick "Load out of date AddOns" on the character-select
 # AddOns screen, which loads it regardless while you correct this number.
 
 Core.lua
