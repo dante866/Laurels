@@ -13,6 +13,20 @@ local addonName, ns = ...
 local KillSource = {}
 ns.KillSource = KillSource
 
+-- Where the player is standing right now. Both forms are returned because they
+-- fail in opposite directions: the name is human-readable and what a deed
+-- stores, but is localized; the uiMapID is language-proof but needs a mapping
+-- table. Trackers match on either (see Engine's zone criterion).
+local function getZone()
+    local name = GetZoneText and GetZoneText()
+    if name == "" then name = nil end
+    local id
+    if C_Map and C_Map.GetBestMapForUnit then
+        id = C_Map.GetBestMapForUnit("player")
+    end
+    return name, id
+end
+
 local function getNpcID(guid)
     if not guid then return nil end
     -- Retail GUID: "Creature-0-serverID-instanceID-zoneUID-NPCID-spawnUID"
@@ -42,10 +56,13 @@ function KillSource:OnCombatLog()
     local petGUID = UnitGUID("pet")
     if sourceGUID ~= playerGUID and sourceGUID ~= petGUID then return end
 
+    local zone, zoneID = getZone()
     self.engine:ReportProgress({
-        kind  = "kill",
-        name  = destName,
-        npcID = getNpcID(destGUID),
+        kind   = "kill",
+        name   = destName,
+        npcID  = getNpcID(destGUID),
+        zone   = zone,
+        zoneID = zoneID,
         amount = 1,
     })
 end

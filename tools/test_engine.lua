@@ -72,6 +72,30 @@ for i = before + 1, #messages do
 end
 check("title re-fires after reset", reearned)
 
+-- Zone criterion: `zone` (a name) and `zoneID` (a uiMapID) assert one thing --
+-- where the kill happened -- so either form alone is enough.
+Engine:CreateTracker({ id = "zoned", name = "Westfall Devils", event = "kill",
+    match = { nameContains = "Dust Devil", zone = "Westfall", zoneID = 52 },
+    tiers = { { count = 2, title = "Devil Chaser" } } })
+Engine:ReportProgress({ kind = "kill", name = "Dust Devil", zone = "Westfall" })
+check("zone name matches", Engine:GetProgress("zoned") == 1)
+Engine:ReportProgress({ kind = "kill", name = "Dust Devil", zone = "WESTFALL" })
+check("zone match is case-insensitive", Engine:GetProgress("zoned") == 2)
+Engine:ReportProgress({ kind = "kill", name = "Dust Devil", zone = "Duskwood" })
+check("wrong zone rejected", Engine:GetProgress("zoned") == 2)
+Engine:ReportProgress({ kind = "kill", name = "Dust Devil", zoneID = 52 })
+check("uiMapID alone matches", Engine:GetProgress("zoned") == 3)
+Engine:ReportProgress({ kind = "kill", name = "Dust Devil", zoneID = 47 })
+check("wrong uiMapID rejected", Engine:GetProgress("zoned") == 3)
+Engine:ReportProgress({ kind = "kill", name = "Dust Devil" })
+check("zone-scoped deed ignores a zoneless signal", Engine:GetProgress("zoned") == 3)
+Engine:DeleteTracker("zoned")
+
+-- A tracker with no zone criterion must keep ignoring zone data on the signal,
+-- so hand-authored deeds from before zone scoping behave exactly as they did.
+Engine:ReportProgress({ kind = "kill", name = "Kobold Vermin", zone = "Durotar" })
+check("zoneless tracker ignores the signal's zone", Engine:GetProgress("kobolds") == 1001)
+
 -- CreateTracker then DeleteTracker.
 local def = Engine:CreateTracker({ name = "Temp", event = "kill",
     match = { nameContains = "Rat" }, tiers = { { count = 5, title = "Ratter" } } })

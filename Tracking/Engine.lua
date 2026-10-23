@@ -5,7 +5,8 @@ local addonName, ns = ...
 -- from sources against them, and resolves title tiers.
 --
 -- A "signal" is a normalized event emitted by a source, e.g.
---   { kind = "kill", name = "Kobold Vermin", npcID = 1234, amount = 1 }
+--   { kind = "kill", name = "Kobold Vermin", npcID = 1234, amount = 1,
+--     zone = "Westfall", zoneID = 52 }
 --
 -- A "tracker" (stored in DeedkeeperDB.trackers) looks like:
 --   { id, name, event = "kill", match = {...}, tiers = { {count, title}, ... } }
@@ -32,6 +33,27 @@ local function matches(criteria, signal)
         local ok = false
         for _, id in ipairs(criteria.npcIDs) do
             if tonumber(id) == tonumber(signal.npcID) then ok = true break end
+        end
+        if not ok then return false end
+    end
+
+    -- Optional zone scoping, so a deed can be "Kobolds of Elwynn" rather than
+    -- kobolds everywhere. `zone` (a name) and `zoneID` (a uiMapID) are two
+    -- spellings of ONE assertion -- "the kill happened here" -- so the
+    -- criterion passes if either supplied form matches, rather than requiring
+    -- both. That keeps a deed counting when the client reports a zone name we
+    -- hold no ID for, or an ID whose name is localized away from our spelling.
+    -- A tracker with no zone criterion ignores a signal's zone entirely, so
+    -- existing deeds are unaffected.
+    if criteria.zone or criteria.zoneID then
+        local ok = false
+        if criteria.zone and signal.zone
+           and string.lower(criteria.zone) == string.lower(signal.zone) then
+            ok = true
+        end
+        if not ok and criteria.zoneID and signal.zoneID
+           and tonumber(criteria.zoneID) == tonumber(signal.zoneID) then
+            ok = true
         end
         if not ok then return false end
     end

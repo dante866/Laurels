@@ -107,6 +107,18 @@ Every matching kill then counts, and the title is yours at 500. Check it
 without farming via `/deed test 500 Murloc`, and `/deed help` prints this same
 worked example in-game. To let others contest the title, `/deed publish <id>`.
 
+**Zone scoping (optional).** A deed's `match` can also carry a `zone` (name) or
+`zoneID` (uiMapID), making "Kobolds of Elwynn" a different deed from kobolds
+everywhere. The two are one assertion — *where the kill happened* — so either
+alone is enough: a name survives a map we have no ID for, an ID survives
+localization. A deed with no zone criterion ignores zone entirely.
+
+`/deed test` sends the zone you're standing in, so append `@Zone` to test a
+deed for somewhere else: `/deed test 25 Dust Devil @Westfall`.
+
+The authoring form doesn't expose a zone field yet — zone-scoped deeds are
+currently reachable from Lua (see below) rather than `/deed new`.
+
 ## Architecture
 
 ```
@@ -118,9 +130,11 @@ UI/MiniPanel.lua         minimal list panel
 ```
 
 A **source** turns WoW events into normalized **signals**:
-`{ kind = "kill", name = "Kobold Vermin", npcID = 1234, amount = 1 }`.
+`{ kind = "kill", name = "Kobold Vermin", npcID = 1234, zone = "Elwynn Forest",
+zoneID = 37, amount = 1 }`.
 The **engine** matches each signal against every tracker whose `event` equals the
-signal `kind`, applies the tracker's `match` criteria (`nameContains`, `npcIDs`),
+signal `kind`, applies the tracker's `match` criteria (`nameContains`, `npcIDs`,
+`zone`/`zoneID`),
 increments per-character progress, and resolves title tiers. Add new trackable things
 (quests, items, zones, emotes) by writing a new source — the engine doesn't change.
 

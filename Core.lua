@@ -206,17 +206,40 @@ SlashCmdList.DEEDKEEPER = function(msg)
 
     elseif cmd == "test" then
         -- Simulate kills without needing mobs:  /deed test 1000 Kobold
-        local n, name = rest:match("^(%d+)%s+(.+)$")
+        -- A zone-scoped deed would never match a zoneless signal, so the
+        -- synthetic kill carries the zone you are standing in. Append "@Zone"
+        -- to pretend otherwise:  /deed test 25 Dust Devil @Westfall
+        local zoneOverride
+        local body = rest:gsub("%s*@(.+)$", function(z)
+            zoneOverride = (z:gsub("^%s+", ""):gsub("%s+$", ""))
+            return ""
+        end)
+
+        local n, name = body:match("^(%d+)%s+(.+)$")
         if n then
             n = tonumber(n)
         else
             n = 1
-            name = (rest ~= "" and rest) or "Kobold Vermin"
+            name = (body ~= "" and body) or "Kobold Vermin"
         end
+
+        local zone, zoneID
+        if zoneOverride then
+            zone = zoneOverride
+        else
+            zone = GetZoneText and GetZoneText()
+            if zone == "" then zone = nil end
+            if C_Map and C_Map.GetBestMapForUnit then
+                zoneID = C_Map.GetBestMapForUnit("player")
+            end
+        end
+
         for _ = 1, n do
-            ns.Engine:ReportProgress({ kind = "kill", name = name })
+            ns.Engine:ReportProgress({ kind = "kill", name = name,
+                zone = zone, zoneID = zoneID })
         end
-        ns:Print(("simulated %d kill(s): %s"):format(n, name))
+        ns:Print(("simulated %d kill(s): %s in %s"):format(
+            n, name, zone or "an unknown zone"))
 
     elseif cmd == "help" then
         ns:Print("commands:")
