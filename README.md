@@ -87,6 +87,26 @@ Copy the `Deedkeeper` folder into your client's AddOns directory, e.g.
 
 `/deed test` fires synthetic kill signals so you can verify tiers without farming mobs.
 
+## Making a deed
+
+Authoring your own is the point of the addon, so the only content it ships is
+one sample deed (Kobold Slaying) and a first-run explanation. There is
+deliberately **no catalogue of premade deeds** — a library of ready-made deeds
+would make the common case "pick one of ours" when it should be "invent one
+and dare people to beat it."
+
+Open `/deed new` (or the **New Deed** button) and fill in two things:
+
+| Field | Example |
+|---|---|
+| **Name** | Murloc Hunting |
+| **Match** | name contains `Murloc`, or specific NPC IDs |
+| **Tiers** | *Murloc Menace* at 500, *Murloc Bane* at 5000 |
+
+Every matching kill then counts, and the title is yours at 500. Check it
+without farming via `/deed test 500 Murloc`, and `/deed help` prints this same
+worked example in-game. To let others contest the title, `/deed publish <id>`.
+
 ## Architecture
 
 ```
@@ -104,7 +124,8 @@ signal `kind`, applies the tracker's `match` criteria (`nameContains`, `npcIDs`)
 increments per-character progress, and resolves title tiers. Add new trackable things
 (quests, items, zones, emotes) by writing a new source — the engine doesn't change.
 
-Add a tracker from Lua (temporary, until the authoring UI exists):
+Add a tracker from Lua (the in-game `/deed new` form is the normal route;
+this is for scripting or seeding defaults):
 
 ```lua
 local ns = select(2, ...)  -- or hook DeedkeeperDB directly

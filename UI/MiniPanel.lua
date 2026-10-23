@@ -54,7 +54,8 @@ function UI:GetFrame()
 
     local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
     empty:SetPoint("CENTER", 0, 10)
-    empty:SetText("No deeds yet.\nClick \"New Deed\" to start.")
+    empty:SetText("No deeds yet.\nClick \"New Deed\" below, or type |cff66ccff/deed new|r.\n\n"
+        .. "|cff999999A deed is a thing to count\nplus the titles you earn for it.|r")
     empty:Hide()
     f.empty = empty
 

@@ -79,6 +79,20 @@ local function initDB()
     ns.charDB = DeedkeeperCharDB
 end
 
+-- Shown once per account. A new player arrives with the sample Kobold deed
+-- already tracking and no indication that authoring their own is the point of
+-- the addon, so say so plainly rather than shipping a catalogue of premades.
+local function showIntro()
+    ns:Print("|cffffd100First time?|r A sample deed is already running: "
+        .. "|cffffffffKobold Slaying|r.")
+    ns:Print("  A deed is |cffffffffsomething to count|r plus the "
+        .. "|cfffffffftitles|r you earn for it.")
+    ns:Print("  e.g. count kills matching \"Murloc\" \226\134\146 "
+        .. "|cffffd100Murloc Menace|r at 500, |cffffd100Murloc Bane|r at 5000.")
+    ns:Print("  Make your own with |cff66ccff/deed new|r. "
+        .. "See a worked example with |cff66ccff/deed help|r.")
+end
+
 local function initModules()
     ns.Engine:Init()
     ns.Engine:RegisterSource("kill", ns.KillSource)
@@ -86,6 +100,10 @@ local function initModules()
     if ns.Rival and ns.Rival.Init then ns.Rival:Init() end
     ns:Print(("v%s loaded. /deed to open the panel, /deed help for commands.")
         :format(ns.version))
+    if not ns.db.seenIntro then
+        ns.db.seenIntro = true
+        showIntro()
+    end
 end
 
 local f = CreateFrame("Frame")
@@ -213,6 +231,15 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")
         ns:Print("  /deed commtest        test whether addon messages work (diagnostic)")
         ns:Print("  /deed test <n> <name> simulate n kills of <name> (for testing)")
+        ns:Print(" ")
+        ns:Print("|cffffd100Making a deed|r \226\128\148 two things: what to count, and the")
+        ns:Print("titles it earns. Open |cff66ccff/deed new|r and fill in:")
+        ns:Print("  |cffffffffName|r    Murloc Hunting")
+        ns:Print("  |cffffffffMatch|r   name contains \"Murloc\"  (or specific NPC IDs)")
+        ns:Print("  |cffffffffTiers|r   Murloc Menace at 500, Murloc Bane at 5000")
+        ns:Print("Then every matching kill counts, and the title is yours at 500.")
+        ns:Print("Try it without farming: |cff66ccff/deed test 500 Murloc|r")
+        ns:Print("Want others to compete for it? |cff66ccff/deed publish <id>|r")
 
     else
         ns:Print("unknown command. try /deed help")
