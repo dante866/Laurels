@@ -63,6 +63,33 @@ end
 local MAPTYPE_CONTINENT = (Enum and Enum.UIMapType and Enum.UIMapType.Continent) or 2
 local MAPTYPE_ZONE      = (Enum and Enum.UIMapType and Enum.UIMapType.Zone) or 3
 
+-- Most menu rows a leaf list may hold. Eastern Kingdoms has ~25 zones, which
+-- overflowed the top of the screen as one submenu -- and UIDropDownMenu's
+-- maxHeight only governs the top-level list, not submenus, so the cap has to
+-- come from how we build the tree rather than from the widget.
+local MAX_LEAF = 15
+
+-- Split a long sorted zone list into alphabetical chunks ("A - D"), so every
+-- leaf menu stays short enough to fit on screen whatever its anchor.
+local function chunkZones(zones)
+    if #zones <= MAX_LEAF then return nil end
+    local chunks = {}
+    local i = 1
+    while i <= #zones do
+        local last = math.min(i + MAX_LEAF - 1, #zones)
+        local part = {}
+        for k = i, last do part[#part + 1] = zones[k] end
+        local a = string.upper(string.sub(zones[i].zone, 1, 1))
+        local b = string.upper(string.sub(zones[last].zone, 1, 1))
+        table.insert(chunks, {
+            label = (a == b) and a or (a .. " \226\128\147 " .. b),
+            zones = part,
+        })
+        i = last + 1
+    end
+    return chunks
+end
+
 local function zoneListFrom(mapID)
     local out, seen = {}, {}
     local ok, kids = pcall(C_Map.GetMapChildrenInfo, mapID, MAPTYPE_ZONE, true)
@@ -94,7 +121,8 @@ local function collectZoneTree()
     for _, cont in ipairs(continents) do
         local zones = zoneListFrom(cont.mapID)
         if #zones > 0 then
-            table.insert(tree, { name = cont.name or "?", zones = zones })
+            table.insert(tree, { name = cont.name or "?", zones = zones,
+                chunks = chunkZones(zones) })
         end
     end
     table.sort(tree, function(a, b) return a.name < b.name end)
@@ -209,34 +237,61 @@ function AuthorForm:GetFrame()
 
             -- One submenu per continent, so no single list can outgrow the
             -- screen the way a flat ~80-entry list does.
-            for i, cont in ipairs(f.zoneTree or {}) do
+            for _, cont in ipairs(f.zoneTree or {}) do
                 info = UIDropDownMenu_CreateInfo()
                 info.text = cont.name
                 info.notCheckable = true
                 info.hasArrow = true
                 info.keepShownOnClick = true
-                info.menuList = i
+                info.menuList = cont
                 UIDropDownMenu_AddButton(info, level)
             end
 
             -- Only reached on a client that reports zones but no continents.
-            for _, z in ipairs(f.zoneList or {}) do
-                info = UIDropDownMenu_CreateInfo()
-                info.text = z.zone
-                info.notCheckable = true
-                info.func = function() chooseZone(z, z.zone) end
-                UIDropDownMenu_AddButton(info, level)
+            -- Chunked the same way, since a flat list is the longest of all.
+            local flat = f.zoneFallback
+            if flat and flat.chunks then
+                for _, chunk in ipairs(flat.chunks) do
+                    info = UIDropDownMenu_CreateInfo()
+                    info.text = chunk.label
+                    info.notCheckable = true
+                    info.hasArrow = true
+                    info.keepShownOnClick = true
+                    info.menuList = chunk
+                    UIDropDownMenu_AddButton(info, level)
+                end
+            elseif flat then
+                for _, z in ipairs(flat.zones) do
+                    info = UIDropDownMenu_CreateInfo()
+                    info.text = z.zone
+                    info.notCheckable = true
+                    info.func = function() chooseZone(z, z.zone) end
+                    UIDropDownMenu_AddButton(info, level)
+                end
             end
 
-        else
-            local cont = (f.zoneTree or {})[menuList]
-            if not cont then return end
-            for _, z in ipairs(cont.zones) do
-                local info = UIDropDownMenu_CreateInfo()
-                info.text = z.zone
-                info.notCheckable = true
-                info.func = function() chooseZone(z, z.zone) end
-                UIDropDownMenu_AddButton(info, level)
+        elseif type(menuList) == "table" then
+            -- A node either fans out into alphabetical chunks (a continent
+            -- with too many zones to show at once) or is a leaf list of zones.
+            -- Chunks are checked first: a chunked continent carries both.
+            if menuList.chunks then
+                for _, chunk in ipairs(menuList.chunks) do
+                    local info = UIDropDownMenu_CreateInfo()
+                    info.text = chunk.label
+                    info.notCheckable = true
+                    info.hasArrow = true
+                    info.keepShownOnClick = true
+                    info.menuList = chunk
+                    UIDropDownMenu_AddButton(info, level)
+                end
+            elseif menuList.zones then
+                for _, z in ipairs(menuList.zones) do
+                    local info = UIDropDownMenu_CreateInfo()
+                    info.text = z.zone
+                    info.notCheckable = true
+                    info.func = function() chooseZone(z, z.zone) end
+                    UIDropDownMenu_AddButton(info, level)
+                end
             end
         end
     end)
@@ -297,7 +352,13 @@ function AuthorForm:Open()
     f.zoneTree = collectZoneTree()
     -- Flat list only as a fallback, so a client reporting no continents still
     -- gets a browsable list instead of nothing.
-    f.zoneList = (#f.zoneTree == 0) and collectZones() or {}
+    f.zoneFallback = nil
+    if #f.zoneTree == 0 then
+        local flat = collectZones()
+        if #flat > 0 then
+            f.zoneFallback = { zones = flat, chunks = chunkZones(flat) }
+        end
+    end
     self:Clear()
     f:Show()
     f.nameEdit:SetFocus()
