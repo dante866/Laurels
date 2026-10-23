@@ -7,18 +7,49 @@ local addonName, ns = ...
 --
 -- Wire format:  <proto>|<TYPE>|<field>|<field>...   (pipes in text escaped)
 -- Types: HELLO | CLAIM | ASK   (DEFPUB for published deeds lands in M4)
+--
+-- Transport: a hidden custom channel, NOT proximity chat. Measured on
+-- WoW-Forever 1.60.1 (build 70532): SendAddonMessage over SAY and YELL is
+-- refused (result 4), while WHISPER and CHANNEL both return 0 and deliver.
+-- There is therefore no range-limited transport available, so the ladder is
+-- server-wide over one shared channel. See docs/rival-layer.md section 3.
+--
+-- Identity is the player GUID, never the name. The same client measurement
+-- showed CHAT_MSG_ADDON `sender` is the full two-part name ("Indira
+-- Resthaerl") while UnitName("player") returns only "Indira", so a
+-- name-based self-check compares unequal and a client logs itself as its own
+-- rival. GUIDs travel in the payload, which also makes the protocol immune
+-- to whatever format `sender` happens to take.
 -- ---------------------------------------------------------------------------
 
 local Comm = {}
 ns.Comm = Comm
 
 Comm.PREFIX = "DEEDK"
-Comm.PROTO = 1
+Comm.PROTO = 2 -- bumped from 1: HELLO/CLAIM now carry a guid field
 Comm.handlers = {}
+
+-- The shared channel every client joins. Hidden from the chat UI because
+-- clients join it temporarily and never print its traffic.
+Comm.CHANNEL_NAME = "Deedkeeper"
+Comm.DEFAULT_CHANNEL = "CHANNEL"
+
+-- Outbound rate limit. Every client hears every claim on a server-wide
+-- channel, and flooding the addon-message pipe disconnects you, so sends are
+-- queued and drained at a fixed rate rather than fired immediately.
+Comm.SEND_INTERVAL = 0.4 -- seconds between queued sends
+Comm.MAX_QUEUE = 64      -- drop oldest beyond this rather than grow forever
 
 -- Player names can't contain '|', but deed keys/titles can, so escape text.
 local function esc(s) return (tostring(s or ""):gsub("|", "\127")) end
 local function unesc(s) return (tostring(s or ""):gsub("\127", "|")) end
+
+-- An absent optional field arrives as "" after a round trip; keep it nil so
+-- callers can test presence rather than comparing against an empty string.
+local function orNil(s)
+    if s == nil or s == "" then return nil end
+    return s
+end
 
 local function split(s, sep)
     local out, i = {}, 1
@@ -34,10 +65,12 @@ end
 function Comm:Encode(msg)
     local t = msg.type
     if t == "HELLO" then
-        return table.concat({ self.PROTO, "HELLO", esc(msg.ver), esc(msg.name) }, "|")
+        return table.concat({ self.PROTO, "HELLO", esc(msg.ver), esc(msg.name),
+            esc(msg.guid) }, "|")
     elseif t == "CLAIM" then
         return table.concat({ self.PROTO, "CLAIM", esc(msg.deedKey),
-            msg.count or 0, msg.tier or 0, esc(msg.name), msg.ts or 0 }, "|")
+            msg.count or 0, msg.tier or 0, esc(msg.name), msg.ts or 0,
+            esc(msg.guid) }, "|")
     elseif t == "ASK" then
         return table.concat({ self.PROTO, "ASK", esc(msg.deedKey) }, "|")
     end
@@ -49,11 +82,13 @@ function Comm:Decode(body)
     if not proto then return nil end
     local t = f[2]
     if t == "HELLO" then
-        return { proto = proto, type = "HELLO", ver = unesc(f[3]), name = unesc(f[4]) }
+        return { proto = proto, type = "HELLO", ver = unesc(f[3]),
+            name = unesc(f[4]), guid = orNil(unesc(f[5])) }
     elseif t == "CLAIM" then
         return { proto = proto, type = "CLAIM", deedKey = unesc(f[3]),
             count = tonumber(f[4]) or 0, tier = tonumber(f[5]) or 0,
-            name = unesc(f[6]), ts = tonumber(f[7]) or 0 }
+            name = unesc(f[6]), ts = tonumber(f[7]) or 0,
+            guid = orNil(unesc(f[8])) }
     elseif t == "ASK" then
         return { proto = proto, type = "ASK", deedKey = unesc(f[3]) }
     end
@@ -64,11 +99,18 @@ function Comm:On(msgType, fn)
     self.handlers[msgType] = fn
 end
 
--- Decode an incoming body, version-gate it, and dispatch to the handler.
+-- Decode an incoming body, version-gate it, drop our own echo, and dispatch.
+--
+-- The echo check lives here rather than in the receive frame because it has
+-- to compare GUIDs, and the GUID is only available after decoding. Comparing
+-- the `sender` string against UnitName (the previous approach) compares a
+-- full two-part name against a first name and never matches, so a client
+-- treated its own broadcasts as a rival's.
 function Comm:HandleRaw(body, sender, channel)
     local msg = self:Decode(body)
     if not msg then return end
-    if msg.proto ~= self.PROTO then return end -- strict version gate for v1
+    if msg.proto ~= self.PROTO then return end -- strict version gate
+    if self.myGuid and msg.guid and msg.guid == self.myGuid then return end
     msg.sender = sender
     msg.channel = channel
     local h = self.handlers[msg.type]
@@ -83,7 +125,18 @@ end
 function Comm:Send(msg, channel, target)
     local body = self:Encode(msg)
     if not body or not self.transport then return end
-    self.transport:Send(self.PREFIX, body, channel or "YELL", target)
+    -- Channel resolution is the transport's job, so this stays pure and the
+    -- headless tests can swap in a fake that ignores `channel` entirely.
+    self.transport:Send(self.PREFIX, body, channel or self.DEFAULT_CHANNEL, target)
+end
+
+-- Current index of our shared channel, or 0 if we aren't in it yet. Indices
+-- are per-session and shift as the player joins and leaves other channels,
+-- so this is resolved per send and never cached.
+function Comm:ChannelIndex()
+    if not GetChannelName then return 0 end
+    local idx = GetChannelName(self.CHANNEL_NAME)
+    return tonumber(idx) or 0
 end
 
 -- WoW-only wiring. Not exercised by headless tests.
@@ -91,23 +144,56 @@ function Comm:InitTransport()
     if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
         C_ChatInfo.RegisterAddonMessagePrefix(self.PREFIX)
     end
+    if JoinTemporaryChannel then
+        JoinTemporaryChannel(self.CHANNEL_NAME)
+    end
 
-    local real = {}
-    function real:Send(prefix, body, channel, target)
+    self.myGuid = UnitGUID and UnitGUID("player")
+
+    local queue = {}
+    local function rawSend(prefix, body, channel, target)
         if ChatThrottleLib then
             ChatThrottleLib:SendAddonMessage("NORMAL", prefix, body, channel, target)
         elseif C_ChatInfo and C_ChatInfo.SendAddonMessage then
             C_ChatInfo.SendAddonMessage(prefix, body, channel, target)
         end
     end
+
+    local draining = false
+    local function drain()
+        local item = table.remove(queue, 1)
+        if not item then draining = false; return end
+        -- Resolve the channel index at send time, not enqueue time.
+        local channel, target = item.channel, item.target
+        if channel == "CHANNEL" and not target then
+            target = Comm:ChannelIndex()
+            if target == 0 then
+                -- Not in the channel yet; put it back and retry shortly.
+                table.insert(queue, 1, item)
+                ns.After(1, drain)
+                return
+            end
+        end
+        rawSend(item.prefix, item.body, channel, target)
+        ns.After(Comm.SEND_INTERVAL, drain)
+    end
+
+    local real = {}
+    function real:Send(prefix, body, channel, target)
+        if #queue >= Comm.MAX_QUEUE then table.remove(queue, 1) end
+        queue[#queue + 1] = { prefix = prefix, body = body,
+            channel = channel, target = target }
+        if not draining then
+            draining = true
+            ns.After(0, drain)
+        end
+    end
     self:SetTransport(real)
 
-    local me = UnitName and UnitName("player")
     local f = CreateFrame("Frame")
     f:RegisterEvent("CHAT_MSG_ADDON")
     f:SetScript("OnEvent", function(_, _, prefix, body, channel, sender)
         if prefix ~= self.PREFIX then return end
-        if sender == me then return end -- ignore our own echo
-        self:HandleRaw(body, sender, channel)
+        self:HandleRaw(body, sender, channel) -- echo dropped by GUID in HandleRaw
     end)
 end

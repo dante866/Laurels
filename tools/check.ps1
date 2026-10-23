@@ -15,8 +15,10 @@ if (-not $luajit) {
 }
 
 $root = Split-Path -Parent $PSScriptRoot
+# Skip tools/ (test harnesses, not shipped) and .claude/ (git worktrees live
+# there -- those are other branches and must not be checked as part of this one).
 $files = Get-ChildItem -Path $root -Recurse -Filter *.lua |
-    Where-Object { $_.FullName -notmatch "\\tools\\" }
+    Where-Object { $_.FullName -notmatch "\\tools\\" -and $_.FullName -notmatch "\\\.claude\\" }
 
 $failed = 0
 foreach ($f in $files) {

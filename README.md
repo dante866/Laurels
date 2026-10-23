@@ -39,15 +39,27 @@ incompatible and silently not load (no error, slash commands just don't register
 - [x] M3 Wire-up (`Rival/Rival.lua`) — publish a deed, auto-broadcast on tier change,
       inbound claims update the ladder and fire "you took / lost the title"
 - [x] `/deed publish|unpublish|rivals <id>` commands
+- [x] **GUID identity** — ladder keyed on player GUID, names display-only; fixes
+      same-name collisions and a client logging itself as its own rival
+- [x] **Channel transport** — `SAY`/`YELL` are refused by this client, so the
+      ladder runs on one shared hidden channel, with built-in send throttling
 - [ ] M4 published-deed definition sync (DEFPUB adopt) — currently two clients must
       share the same `uuid`; adoption makes that automatic
-- [ ] M5 holder/rank in the panel UI + steal toasts; vendor ChatThrottleLib
+- [ ] M5 holder/rank in the panel UI + steal toasts
+
+⚠️ **The ladder is server-wide, not nearby.** Addon messages over proximity
+chat are rejected on this client (measured — `docs/rival-layer.md` §3), so
+there is no range-limited transport. Everyone running the addon who has joined
+the shared channel hears every published claim.
+
+On login you will see the client's **Code of Conduct notice** in chat. That is
+the game reacting to joining a channel, not an addon error.
 
 Known limitations (by design, see `docs/rival-layer.md` §5):
 - The rate cap only catches *acceleration* of a known rival; a brand-new contact's
   first absolute count can't be sanity-checked (no baseline). Social-trust covers this.
-- Claimants are keyed by chat sender name; connected-realm name suffixes may split a
-  player into two entries until M4 normalizes identity.
+- Titles are per-character: GUIDs expose no account handle, so your own alts
+  compete with each other.
 
 ### Developing
 
@@ -109,12 +121,12 @@ ns.Engine:CreateTracker({
 
 ## Roadmap
 
-**v2 — rival / steal layer (auto-broadcast nearby).** When you earn or extend a title,
-broadcast `{trackerId, count, title}` on an addon comm channel; nearby Deedkeeper users
-compare counts and the top count holds the title. Hooks left in `Engine:Increment`.
-Open design questions: comm transport (addon message channels + throttling/versioning),
-how shared tracker *definitions* propagate so two players count "the same" thing, and
-anti-spoof (counts are client-trusted among a trusted RP community — acceptable for v1).
+**M4 — published-deed definition sync.** Today two clients must already share a
+deed's `uuid` to contest it. `DEFPUB` lets an author publish the definition so
+others can adopt it — which is the "issue a challenge" feature proper.
+
+**M5 — UI.** Holder and your rank in the panel; "you took / lost the title"
+toasts. The data is already there; nothing renders it yet.
 
 **TRP3 integration (user idea).** Total RP 3 is the de-facto RP profile addon; hooking
 it would be a great distribution + display surface. Plan: keep this core **TRP3-agnostic**

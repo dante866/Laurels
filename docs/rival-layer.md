@@ -37,30 +37,59 @@ Two players can only compete if they agree they're tracking **the same deed**. M
 goal the *same* feature: publishing a deed = issuing a challenge; adopting it =
 accepting; the ladder = the scoreboard.
 
-## 3. Transport
+## 3. Transport — **measured, not assumed**
 
 WoW addon messages go over a chat channel via
 `C_ChatInfo.SendAddonMessage(prefix, body, channel[, target])`, after
-`C_ChatInfo.RegisterAddonMessagePrefix("DEEDK")`. There is **no true "nearby"
-channel** — proximity is approximated by range-limited chat channels.
+`C_ChatInfo.RegisterAddonMessagePrefix("DEEDK")`.
+
+This section originally recommended `YELL` for a proximity broadcast. **That
+does not work on this client.** Measured in-game with `/deed commtest` on
+WoW-Forever 1.60.1 (build 70532, TOC 16001), prefix registered successfully:
+
+| Channel | `SendAddonMessage` result | Delivered? |
+|---|---|---|
+| `SAY` | **4** (rejected) | no |
+| `YELL` | **4** (rejected) | no |
+| `WHISPER` (to self) | 0 | **yes** |
+| custom `CHANNEL` | 0 | **yes** |
+
+`0` is success; the non-zero code is a chat-type rejection. Retail restricted
+addon messages over proximity chat years ago and this build inherits it.
+
+**There is therefore no range-limited transport available at all.** Every
+remaining option is membership-based, not distance-based:
 
 | Channel | Reaches | Fits |
 |---|---|---|
-| `SAY` | ~40yd, same zone | very local |
-| `YELL` | large radius / zone-ish, same faction | **"auto-broadcast nearby"** (your pick) |
 | `PARTY`/`RAID` | your group anywhere | group challenges |
-| `GUILD` | whole guild anywhere | guild ladders (easy add) |
-| custom hidden `CHANNEL` | everyone with the addon who joined it (server-wide) | a future *global* ladder; spammy, not "nearby" |
+| `GUILD` | whole guild anywhere | guild ladders (untested here — not in a guild) |
+| custom hidden `CHANNEL` | everyone with the addon who joined it (server-wide) | **the ladder transport** |
 
-**Recommendation:** `YELL` for the nearby broadcast (matches your earlier choice),
-with `GUILD` as a cheap opt-in second scope. Defer the global channel.
+**Decision: one shared hidden channel (`Deedkeeper`), joined on login.** The
+ladder is server-wide. This is arguably a better fit for the actual goal —
+publishing a deed is *issuing a challenge*, and a challenge shouldn't require
+the challenger to be standing next to you.
 
-Encoding & rate: payload is tiny and fixed, so a hand-rolled pipe-delimited string
-(`v1|type|deedKey|count|tier|name|ts`) beats pulling in AceSerializer. **But** the
-addon-message pipe has a hard bandwidth cap — flooding it disconnects you. We embed
-**ChatThrottleLib** (tiny, battle-tested, used by most addons) for outbound sends.
-Dependency tradeoff: hand-roll everything = fewer files but we'd reinvent throttling
-badly; embedding one proven lib for the one genuinely hard part is the right call.
+Two implementation constraints learned the hard way:
+
+- **Channel indices are per-session and shift** as the player joins and leaves
+  other channels. Resolve via `GetChannelName` on every send; never cache.
+- **`JoinTemporaryChannel` triggers the client's Code of Conduct notice** in
+  chat on login. Harmless, but users will see it and it is not an addon bug.
+
+If the nearby *flavour* is wanted back, it has to be done at the application
+layer: put the zone in the CLAIM and filter the display to same-zone. That is
+self-reported, but §5 already accepts self-reported counts, so it introduces
+no new trust assumption.
+
+Encoding & rate: payload is tiny and fixed, so a hand-rolled pipe-delimited
+string (`2|TYPE|...`) beats pulling in AceSerializer. **But** a server-wide
+channel means every client hears every claim, and the addon-message pipe has a
+hard bandwidth cap — flooding it disconnects you. Throttling is therefore
+mandatory, not optional. `Comm:InitTransport` queues sends and drains them at
+`SEND_INTERVAL`; if ChatThrottleLib is dropped in alongside the addon it is
+used in preference. Broadcast on tier change only — no chatty heartbeat.
 
 ## 4. Sync strategy
 
@@ -90,13 +119,18 @@ We ship 1 + 2 and say so plainly in the UI copy.
 
 ## 6. Protocol sketch
 
-Prefix `DEEDK`. Body `v1|TYPE|...`:
-- `HELLO|ver|name` — presence, on login/zone.
-- `CLAIM|deedKey|count|tier|name|ts` — progress/holder update.
-- `DEFPUB|uuid|ver|serialized-definition` — publish/adopt a deed definition.
+Prefix `DEEDK`. Body `2|TYPE|...` (proto bumped 1 → 2 to carry `guid`):
+- `HELLO|ver|name|guid` — presence, on login.
+- `CLAIM|deedKey|count|tier|name|ts|guid` — progress/holder update.
+- `DEFPUB|uuid|ver|serialized-definition` — publish/adopt a deed definition (M4).
 - `ASK|deedKey` — request claims for a deed (handshake).
 
-All outbound sends go through ChatThrottleLib at a low priority.
+`guid` is the identity for every purpose: ladder key, holder comparison, and
+the self-echo check. `name` is a display label only — see §10. Carrying the
+GUID in the payload also means nothing depends on the format of the
+`CHAT_MSG_ADDON` `sender` string, which is client-specific.
+
+All outbound sends are queued and rate-limited (§3).
 
 ## 7. Data model additions
 
@@ -118,11 +152,53 @@ All outbound sends go through ChatThrottleLib at a low priority.
 M1 and M2 are where the real correctness risk lives, and both can be fully tested
 with LuaJIT before anything touches the game.
 
-## 9. Open decisions (need your call)
+## 9. Decisions (resolved)
 
-1. **Deed identity** — go with hybrid published-deeds (§2 iii)? This couples "steal"
-   and "challenge others" into one feature.
-2. **Scope** — `YELL` nearby only for now, or also `GUILD` from the start?
-3. **Trust** — ship social-trust + rate cap (§5) and move on? (recommended)
-4. **Dependency** — OK to embed ChatThrottleLib (one small vendored lib) for send
-   throttling?
+1. **Deed identity** — hybrid published-deeds (§2 iii). Publishing a deed *is*
+   issuing a challenge. ✅
+2. **Scope** — one shared server-wide channel. Not a choice in the end: `SAY`
+   and `YELL` are refused by the client (§3), so there is no nearby option. ✅
+3. **Trust** — social trust + rate cap (§5). ✅
+4. **Throttling** — built in rather than vendored. ChatThrottleLib could not be
+   fetched offline, and inventing a copy from memory would be worse than a
+   small queue we control. `Comm` queues and drains at a fixed interval, and
+   defers to ChatThrottleLib if it is ever present. ✅
+
+Still open:
+
+- **Per-character or per-account?** GUIDs are per-character and expose no
+  account handle (`Player-4618-00D1568C` = realm 4618 + character). Per-account
+  would need manual alt-grouping. Currently per-character.
+- **Zone filtering** — restore a "nearby" display filter (§3)? Cosmetic.
+
+## 10. Player identity on this client — **measured**
+
+WoW-Forever uses two-part character names, and the name APIs report them in a
+way that is actively misleading. From `/deed whoami`:
+
+```
+UnitName("player")          = "Indira", "Resthaerl"
+GetUnitName(player, false)  = "Indira Resthaerl"
+GetUnitName(player, true)   = "Indira Resthaerl"
+GetRealmName()              = "Classic Beta PvE"
+UnitGUID("player")          = "Player-4618-00D1568C"
+CHAT_MSG_ADDON sender       = "Indira Resthaerl"
+```
+
+`Resthaerl` is a **surname, not a realm** — the realm is `Classic Beta PvE`.
+The surname occupies the slot where stock WoW puts the realm, and both
+`GetUnitName` forms return the same string (stock WoW differs between them),
+with a **space** separator rather than the `-Realm` suffix stock WoW uses.
+
+Consequences, all of which were live bugs:
+
+- `UnitName("player")` yields only `Indira`, so any other first-name-Indira
+  character **collided into the same ladder entry**.
+- `sender` (`Indira Resthaerl`) never equalled `UnitName` (`Indira`), so the
+  self-echo guard never fired: a client **logged itself as its own rival**,
+  appearing twice on its own leaderboard.
+
+**Resolution: key on GUID everywhere, name is display-only.** `GetUnitName
+("player", false)` is the only API returning the full name, so it is the
+display label. Regression tests covering both failures live in
+`tools/test_comm.lua` and `tools/test_rival.lua`.

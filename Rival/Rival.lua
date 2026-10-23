@@ -15,7 +15,8 @@ local Rival = {}
 ns.Rival = Rival
 
 Rival.HEARTBEAT = 30 -- seconds between rebroadcasts of unchanged progress
-Rival.lastHolder = {}
+Rival.lastHolder = {}     -- deedKey -> guid of the last known holder
+Rival.lastHolderName = {} -- deedKey -> that holder's display name
 Rival._bcast = {}
 
 local function genUUID()
@@ -30,8 +31,24 @@ function Rival:Now()
     return os.time()
 end
 
+-- Display label only -- never an identity key. On WoW-Forever a character is
+-- "First Last", and GetUnitName(player,false) is the only API that returns
+-- both parts; UnitName("player") returns just "Indira" and puts the surname
+-- in the slot where stock WoW puts the realm.
 function Rival:MyName()
-    return self._name or (UnitName and UnitName("player")) or "You"
+    if self._name then return self._name end
+    if GetUnitName then
+        local full = GetUnitName("player", false)
+        if full and full ~= "" then return full end
+    end
+    return (UnitName and UnitName("player")) or "You"
+end
+
+-- The identity key for everything: ladder entries, holder comparison, and the
+-- self-echo check. Unique per character and immune to renames and to the
+-- two-name display format.
+function Rival:MyGuid()
+    return self._guid or (UnitGUID and UnitGUID("player")) or self:MyName()
 end
 
 -- Stable identity for a deed across players. Published deeds share the author's
@@ -72,18 +89,23 @@ end
 function Rival:AfterLadderChange(key, tracker)
     tracker = tracker or self:FindTracker(key)
     local holder = ns.Ladder:GetHolder(key)
-    local prevName = self.lastHolder[key]
-    local newName = holder and holder.name or nil
-    self.lastHolder[key] = newName
+    -- Compare holders by GUID; names are ambiguous (two "Indira"s collide)
+    -- and can change, which would fire spurious steal announcements.
+    local prevGuid = self.lastHolder[key]
+    local prevName = self.lastHolderName[key]
+    local newGuid = holder and holder.guid or nil
+    self.lastHolder[key] = newGuid
+    self.lastHolderName[key] = holder and holder.name or nil
 
-    if holder and holder.tier and holder.tier > 0 and newName ~= prevName then
+    if holder and holder.tier and holder.tier > 0 and newGuid ~= prevGuid then
         local title = titleFor(tracker, holder.tier) or (tracker and tracker.name) or key
-        local me = self:MyName()
-        if newName == me and prevName and prevName ~= me then
-            ns:Print(("You took |cffffd100%s|r from %s!"):format(title, prevName))
-        elseif prevName == me and newName ~= me then
+        local me = self:MyGuid()
+        if newGuid == me and prevGuid and prevGuid ~= me then
+            ns:Print(("You took |cffffd100%s|r from %s!")
+                :format(title, prevName or "someone"))
+        elseif prevGuid == me and newGuid ~= me then
             ns:Print(("%s took |cffffd100%s|r from you! (they have %d)")
-                :format(newName, title, holder.count))
+                :format(holder.name or "Someone", title, holder.count))
         end
     end
 
@@ -95,9 +117,10 @@ function Rival:ForceBroadcast(tracker)
     local key = self:KeyFor(tracker)
     local count = ns.Engine:GetProgress(tracker.id)
     local tier = ns.Engine:CurrentTierIndex(tracker, count)
-    local me, ts = self:MyName(), self:Now()
+    local me, guid, ts = self:MyName(), self:MyGuid(), self:Now()
     self._bcast[key] = { tier = tier, t = ts }
-    ns.Comm:Send({ type = "CLAIM", deedKey = key, count = count, tier = tier, name = me, ts = ts }, "YELL")
+    ns.Comm:Send({ type = "CLAIM", deedKey = key, count = count, tier = tier,
+        name = me, guid = guid, ts = ts })
 end
 
 -- Called by Engine:Increment after every local progress tick.
@@ -106,17 +129,19 @@ function Rival:OnLocalProgress(tracker)
     local key = self:KeyFor(tracker)
     local count = ns.Engine:GetProgress(tracker.id)
     local tier = ns.Engine:CurrentTierIndex(tracker, count)
-    local me, ts = self:MyName(), self:Now()
+    local me, guid, ts = self:MyName(), self:MyGuid(), self:Now()
 
     -- Keep our own ladder entry current (local, trusted, no network).
-    ns.Ladder:RecordClaim(key, me, { name = me, count = count, tier = tier, ts = ts }, { trusted = true })
+    ns.Ladder:RecordClaim(key, guid, { name = me, count = count, tier = tier, ts = ts },
+        { trusted = true })
     self:AfterLadderChange(key, tracker)
 
     -- Broadcast immediately on a tier change; otherwise at most once per HEARTBEAT.
     local st = self._bcast[key] or { tier = -1, t = 0 }
     if tier > st.tier or (ts - st.t) >= self.HEARTBEAT then
         self._bcast[key] = { tier = tier, t = ts }
-        ns.Comm:Send({ type = "CLAIM", deedKey = key, count = count, tier = tier, name = me, ts = ts }, "YELL")
+        ns.Comm:Send({ type = "CLAIM", deedKey = key, count = count, tier = tier,
+            name = me, guid = guid, ts = ts })
     end
 end
 
@@ -124,10 +149,13 @@ end
 
 function Rival:OnClaim(msg)
     local key = msg.deedKey
-    local who = msg.sender or msg.name
-    if not who then return end
-    ns.Ladder:RecordClaim(key, who,
-        { name = msg.name or who, count = msg.count, tier = msg.tier, ts = msg.ts })
+    -- Key strictly on the GUID in the payload. The `sender` string is a
+    -- display name and is not a stable identity on this client.
+    local guid = msg.guid
+    if not guid then return end
+    ns.Ladder:RecordClaim(key, guid,
+        { name = msg.name or msg.sender or guid, count = msg.count,
+          tier = msg.tier, ts = msg.ts })
     self:AfterLadderChange(key)
 end
 
@@ -147,6 +175,7 @@ end
 
 function Rival:WireHandlers()
     self.lastHolder = self.lastHolder or {}
+    self.lastHolderName = self.lastHolderName or {}
     self._bcast = self._bcast or {}
     ns.Comm:On("CLAIM", function(m) self:OnClaim(m) end)
     ns.Comm:On("HELLO", function(m) self:OnHello(m) end)
@@ -156,6 +185,11 @@ end
 function Rival:Init()
     self:WireHandlers()
     ns.Comm:InitTransport()
-    -- Announce ourselves so nearby clients send us their current standings.
-    ns.Comm:Send({ type = "HELLO", ver = ns.version, name = self:MyName() }, "YELL")
+    -- Announce ourselves so other clients send us their current standings.
+    -- Delayed because JoinTemporaryChannel has to land before the channel has
+    -- an index to send on; the send queue retries, but this avoids the churn.
+    ns.After(3, function()
+        ns.Comm:Send({ type = "HELLO", ver = ns.version,
+            name = self:MyName(), guid = self:MyGuid() })
+    end)
 end

@@ -93,23 +93,7 @@ end
 local COMM_TEST_PREFIX = "DEEDKTEST"
 local TEST_CHANNEL = "DeedkeeperTest"
 
--- Run fn after `delay` seconds. C_Timer is 6.0+; fall back to an OnUpdate
--- ticker so this probe still works if the client predates it.
-local function after(delay, fn)
-    if C_Timer and C_Timer.After then
-        C_Timer.After(delay, fn)
-        return
-    end
-    local f = CreateFrame("Frame")
-    local elapsed = 0
-    f:SetScript("OnUpdate", function(self, dt)
-        elapsed = elapsed + (dt or 0)
-        if elapsed >= delay then
-            self:SetScript("OnUpdate", nil)
-            fn()
-        end
-    end)
-end
+local after = ns.After -- shared timer helper from Core.lua
 
 local function sendFn()
     return (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage

@@ -9,8 +9,14 @@ local KEY = "DEED-KOBOLD"
 local clock = 0
 local function now() clock = clock + 1; return clock end
 
-local function makeClient(name)
-    local c = { name = name, messages = {} }
+-- GUIDs look like the real thing (Player-<realmID>-<hex>) so the tests
+-- exercise the same shape the client produces.
+local function guidFor(name)
+    return "Player-4618-" .. name
+end
+
+local function makeClient(name, guid)
+    local c = { name = name, guid = guid or guidFor(name), messages = {} }
     local ns = { db = { trackers = {} }, charDB = { progress = {}, earned = {} }, version = "test" }
     function ns:Print(...)
         local p = {}
@@ -29,19 +35,30 @@ local function makeClient(name)
     }
     ns.Engine:Init()
     ns.Rival._name = name
+    ns.Rival._guid = c.guid
     ns.Rival._nowFn = now
+    ns.Comm.myGuid = c.guid -- so the self-echo guard has something to compare
     ns.Rival:WireHandlers()
     c.ns = ns
     return c
 end
 
--- Connect clients: a YELL send from one is delivered to every other.
+-- Connect clients over a shared bus. Two details make this match the real
+-- client rather than a convenient fiction:
+--   * delivery goes to EVERY client including the sender, as a shared
+--     channel does, so the self-echo path is actually exercised;
+--   * the sender string deliberately differs from the name a client knows
+--     itself by, because CHAT_MSG_ADDON hands back the full "Indira
+--     Resthaerl" while UnitName("player") returns only "Indira". Keying on
+--     anything derived from these strings is what broke before.
+local function senderFor(c) return c.name .. " Resthaerl" end
+
 local function connect(clients)
     for _, c in ipairs(clients) do
         c.ns.Comm:SetTransport({
             Send = function(_, _, body, channel)
                 for _, other in ipairs(clients) do
-                    if other ~= c then other.ns.Comm:HandleRaw(body, c.name, channel) end
+                    other.ns.Comm:HandleRaw(body, senderFor(c), channel)
                 end
             end,
         })
@@ -87,15 +104,39 @@ check("Alice was told she lost it", has(A, "from you"))
 -- 4. Rate cap: a forged jump for an already-known rival is rejected.
 local before = A.ns.Ladder:GetHolder(KEY).count
 A.ns.Comm:HandleRaw(A.ns.Comm:Encode(
-    { type = "CLAIM", deedKey = KEY, count = 100000000, tier = 2, name = "Bob", ts = now() }), "Bob", "YELL")
+    { type = "CLAIM", deedKey = KEY, count = 100000000, tier = 2, name = "Bob",
+      guid = B.guid, ts = now() }), "Bob", "CHANNEL")
 check("forged jump for known rival rejected", A.ns.Ladder:GetHolder(KEY).count == before)
 
 -- 5. HELLO convergence: a late joiner learns the current standings.
 local C = makeClient("Cara")
 connect({ A, B, C })
-C.ns.Comm:Send({ type = "HELLO", ver = "test", name = "Cara" }, "YELL")
+C.ns.Comm:Send({ type = "HELLO", ver = "test", name = "Cara", guid = C.guid })
 check("newcomer learned the holder via HELLO",
     C.ns.Ladder:GetHolder(KEY) and C.ns.Ladder:GetHolder(KEY).name == "Bob")
+
+-- 6. Self-echo. On a shared channel your own broadcast comes straight back
+-- with a sender string ("Solo Resthaerl") that does not match the name the
+-- client knows itself by ("Solo"). Under the old name keying the echo landed
+-- under a second key and you appeared on your own leaderboard twice, as your
+-- own rival. Keying on GUID collapses it to the one entry it should be.
+local S = makeClient("Solo")
+connect({ S })
+farm(S, "Kobold", 1000)
+check("own echo did not create a second entry", #S.ns.Ladder:GetStandings(KEY) == 1)
+check("that entry is keyed by our guid", S.ns.Ladder:GetHolder(KEY).guid == S.guid)
+
+-- 7. Two characters sharing a display name must stay distinct. Under the old
+-- name keying they collapsed into one ladder entry and overwrote each other.
+local D1 = makeClient("Indira", "Player-4618-00D1568C")
+local D2 = makeClient("Indira", "Player-4618-00FFFFFF")
+connect({ D1, D2 })
+farm(D1, "Kobold", 1000)
+farm(D2, "Kobold", 2000)
+D2.ns.Rival:ForceBroadcast(D2.ns.db.trackers[1])
+check("same-name characters are separate rivals", #D1.ns.Ladder:GetStandings(KEY) == 2)
+check("the higher count holds despite identical names",
+    D1.ns.Ladder:GetHolder(KEY).count == 2000)
 
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

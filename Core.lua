@@ -16,6 +16,25 @@ local function deepcopy(t)
 end
 ns.deepcopy = deepcopy
 
+-- Run fn after `delay` seconds. C_Timer is 6.0+; fall back to an OnUpdate
+-- ticker so this still works on clients that predate it. Returns nothing.
+function ns.After(delay, fn)
+    if C_Timer and C_Timer.After then
+        C_Timer.After(delay, fn)
+        return
+    end
+    if not CreateFrame then return end
+    local f = CreateFrame("Frame")
+    local elapsed = 0
+    f:SetScript("OnUpdate", function(self, dt)
+        elapsed = elapsed + (dt or 0)
+        if elapsed >= delay then
+            self:SetScript("OnUpdate", nil)
+            fn()
+        end
+    end)
+end
+
 function ns:Print(...)
     local parts = {}
     for i = 1, select("#", ...) do
