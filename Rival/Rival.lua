@@ -131,19 +131,32 @@ function Rival:ForceBroadcast(tracker)
         name = me, guid = guid, ts = ts })
 end
 
--- Called by Engine:Increment after every local progress tick.
-function Rival:OnLocalProgress(tracker)
-    if not self:ShouldBroadcast(tracker) then return end
+-- Write our own standing into the ladder: local, trusted, no network.
+--
+-- Deliberately NOT gated on the deed being published. The ladder is what
+-- /deed rivals renders, and you hold your own deed whether or not anyone else
+-- can contest it -- gating this on publishing is why an unpublished deed
+-- showed "no claims heard yet" while you were standing on 20 kills.
+-- Publishing gates *broadcasting*, which is a separate thing.
+function Rival:RecordOwnClaim(tracker)
     local key = self:KeyFor(tracker)
     local count = ns.Engine:GetProgress(tracker.id)
     local tier = ns.Engine:CurrentTierIndex(tracker, count)
-    local me, guid, ts = self:MyName(), self:MyGuid(), self:Now()
-
-    -- Keep our own ladder entry current (local, trusted, no network).
-    ns.Ladder:RecordClaim(key, guid, { name = me, count = count, tier = tier, ts = ts },
+    ns.Ladder:RecordClaim(key, self:MyGuid(),
+        { name = self:MyName(), count = count, tier = tier, ts = self:Now() },
         { trusted = true })
+    return key, count, tier
+end
+
+-- Called by Engine:Increment after every local progress tick.
+function Rival:OnLocalProgress(tracker)
+    local key, count, tier = self:RecordOwnClaim(tracker)
     self:AfterLadderChange(key, tracker)
 
+    -- Everything below is the network half, which publishing does gate.
+    if not self:ShouldBroadcast(tracker) then return end
+
+    local me, guid, ts = self:MyName(), self:MyGuid(), self:Now()
     -- Broadcast immediately on a tier change; otherwise at most once per HEARTBEAT.
     local st = self._bcast[key] or { tier = -1, t = 0 }
     if tier > st.tier or (ts - st.t) >= self.HEARTBEAT then

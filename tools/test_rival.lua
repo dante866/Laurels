@@ -148,5 +148,26 @@ check("tier resolves to its title",
 check("tier 0 has no title yet", A.ns.Rival:TitleFor(tracker, 0) == nil)
 check("a tier past the list is nil", A.ns.Rival:TitleFor(tracker, 99) == nil)
 
+-- 9. You hold your own UNPUBLISHED deed. Recording was previously gated on
+-- the same flag as broadcasting, so a private deed showed an empty ladder
+-- while you stood on a full count -- /deed rivals said "no claims heard yet".
+local P = makeClient("Agdamar")
+P.ns.db.trackers[1].published = false
+P.ns.db.trackers[1].uuid = nil -- unpublished deeds fall back to a derived key
+local PKEY = P.ns.Rival:KeyFor(P.ns.db.trackers[1])
+farm(P, "Kobold", 1000)
+local mine = P.ns.Ladder:GetHolder(PKEY)
+check("an unpublished deed still records us", mine ~= nil)
+check("with our real count", mine and mine.count == 1000)
+check("and our earned tier", mine and mine.tier == 1)
+check("and it is us", mine and mine.guid == P.guid)
+
+-- Nothing was broadcast, though: that half stays gated on publishing.
+local Q = makeClient("Watcher")
+connect({ P, Q })
+farm(P, "Kobold", 10)
+check("an unpublished deed broadcasts nothing",
+    Q.ns.Ladder:GetHolder(PKEY) == nil)
+
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

@@ -209,6 +209,10 @@ SlashCmdList.DEEDKEEPER = function(msg)
         if not t then
             ns:Print("usage: /deed rivals <trackerId>")
         else
+            -- Refresh our own standing before rendering: progress banked
+            -- before the deed ever entered the ladder would otherwise not
+            -- show up until the next kill landed.
+            ns.Rival:RecordOwnClaim(t)
             local standings = ns.Ladder:GetStandings(ns.Rival:KeyFor(t))
             if #standings == 0 then
                 ns:Print("no claims heard yet for:", t.name)
@@ -225,6 +229,10 @@ SlashCmdList.DEEDKEEPER = function(msg)
                                or "|cff999999(no title yet)|r",
                         (i == 1) and "  (holder)" or "",
                         (e.guid == myGuid) and "  |cff00ff00(you)|r" or ""))
+                end
+                if not t.published then
+                    ns:Print(("  |cff999999Unpublished \226\128\148 no one else can "
+                        .. "contest it yet. /deed publish %s|r"):format(t.id))
                 end
             end
         end

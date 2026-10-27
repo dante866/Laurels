@@ -30,16 +30,29 @@ function Ladder:RecordClaim(deedKey, guid, claim, opts)
     local s = store(deedKey)
     local existing = s[guid]
 
-    -- Last-writer-wins by timestamp; older/equal timestamps are stale.
-    if existing and claim.ts <= existing.ts then
-        return "stale"
-    end
+    if opts.trusted then
+        -- Our own count is authoritative, so it is NOT subject to the
+        -- timestamp check. The clock has one-second resolution, and several
+        -- kills inside one second would otherwise be discarded as "stale",
+        -- freezing our ladder entry behind our real progress.
+        --
+        -- An unchanged count is still a no-op, which keeps the original ts so
+        -- the holder tie-break still rewards having got there first.
+        if existing and claim.count == existing.count then
+            return "stale"
+        end
+    else
+        -- Remote claims: last-writer-wins by timestamp.
+        if existing and claim.ts <= existing.ts then
+            return "stale"
+        end
 
-    -- Rate sanity cap on remote increases only.
-    if not opts.trusted and existing and claim.count > existing.count then
-        local dt = math.max(1, claim.ts - existing.ts)
-        if (claim.count - existing.count) / dt > self.MAX_RATE then
-            return "rejected"
+        -- Rate sanity cap, remote increases only.
+        if existing and claim.count > existing.count then
+            local dt = math.max(1, claim.ts - existing.ts)
+            if (claim.count - existing.count) / dt > self.MAX_RATE then
+                return "rejected"
+            end
         end
     end
 
