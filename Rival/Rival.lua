@@ -78,11 +78,19 @@ function Rival:FindTracker(key)
     end
 end
 
-local function titleFor(tracker, tierIndex)
+-- The title a claim's tier index corresponds to, or nil below the first tier.
+-- A claim carries the tier it reached, not the title text, so resolving it
+-- needs the tracker -- which is why this is public: the ladder display needs
+-- it as much as the steal announcements do.
+function Rival:TitleFor(tracker, tierIndex)
     if tracker and tracker.tiers and tierIndex and tierIndex > 0 then
         local t = tracker.tiers[tierIndex]
         return t and t.title
     end
+end
+
+local function titleFor(tracker, tierIndex)
+    return Rival:TitleFor(tracker, tierIndex)
 end
 
 -- Recompute the holder for a deed and announce if the title changed hands.

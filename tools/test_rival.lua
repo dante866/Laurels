@@ -138,5 +138,15 @@ check("same-name characters are separate rivals", #D1.ns.Ladder:GetStandings(KEY
 check("the higher count holds despite identical names",
     D1.ns.Ladder:GetHolder(KEY).count == 2000)
 
+-- 8. Standings carry the tier each rival reached, and that resolves to the
+-- title text the ladder display shows alongside the count.
+local tracker = A.ns.db.trackers[1]
+local board = A.ns.Ladder:GetStandings(KEY)
+check("standings expose a tier", board[1].tier ~= nil and board[1].tier > 0)
+check("tier resolves to its title",
+    A.ns.Rival:TitleFor(tracker, board[1].tier) == "Kobold Slayer")
+check("tier 0 has no title yet", A.ns.Rival:TitleFor(tracker, 0) == nil)
+check("a tier past the list is nil", A.ns.Rival:TitleFor(tracker, 99) == nil)
+
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

@@ -214,9 +214,17 @@ SlashCmdList.DEEDKEEPER = function(msg)
                 ns:Print("no claims heard yet for:", t.name)
             else
                 ns:Print(("Rivals for %s:"):format(t.name))
+                local myGuid = ns.Rival:MyGuid()
                 for i, e in ipairs(standings) do
-                    ns:Print(("  %d. %s \226\128\148 %d%s"):format(
-                        i, e.name, e.count, (i == 1) and "  (holder)" or ""))
+                    -- A claim stores the tier it reached, not the title text,
+                    -- so resolve it against this deed's tiers.
+                    local title = ns.Rival:TitleFor(t, e.tier)
+                    ns:Print(("  %d. %s \226\128\148 %d  %s%s%s"):format(
+                        i, e.name, e.count,
+                        title and ("|cffffd100<" .. title .. ">|r")
+                               or "|cff999999(no title yet)|r",
+                        (i == 1) and "  (holder)" or "",
+                        (e.guid == myGuid) and "  |cff00ff00(you)|r" or ""))
                 end
             end
         end
