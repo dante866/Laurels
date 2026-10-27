@@ -145,9 +145,29 @@ end
 
 -- --- authoring API --------------------------------------------------------
 
+-- Deed ids are typed by hand (/deed publish <id>, /deed reset <id>), so they
+-- are derived from the name rather than generated: "Mottled Boars" -> boars-ish
+-- "mottledboars", not "deed17619234567823". Collisions get a numeric suffix.
+local function slugify(name)
+    local s = string.gsub(string.lower(tostring(name or "")), "[^%a%d]", "")
+    if s == "" then return "deed" end
+    return string.sub(s, 1, 24)
+end
+
+function Engine:GenerateID(name)
+    local base = slugify(name)
+    if not self:GetTracker(base) then return base end
+    for i = 2, 999 do
+        local candidate = base .. i
+        if not self:GetTracker(candidate) then return candidate end
+    end
+    -- Pathological: fall back to something guaranteed unique.
+    return base .. tostring((time and time()) or os.time())
+end
+
 function Engine:CreateTracker(def)
     assert(type(def) == "table", "tracker def must be a table")
-    def.id = def.id or ("deed" .. tostring(time()) .. tostring(math.random(10000)))
+    def.id = def.id or self:GenerateID(def.name)
     def.event = def.event or "kill"
     def.tiers = def.tiers or {}
     table.sort(def.tiers, function(a, b) return a.count < b.count end)

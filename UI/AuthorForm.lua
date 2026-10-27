@@ -414,8 +414,12 @@ function AuthorForm:Save()
         match = match,
         tiers = tiers,
     })
-    ns:Print(("Created deed: %s (%d tier%s)%s."):format(
+    ns:Print(("Created deed: |cffffd100%s|r (%d tier%s)%s."):format(
         def.name, #tiers, #tiers == 1 and "" or "s",
         match.zone and (" in " .. match.zone) or ""))
+    -- Surface the id here: it is what every other command takes, and the
+    -- obvious next step after authoring a deed is publishing it.
+    ns:Print(("  id |cffffd100%s|r \226\128\148 publish it with |cff66ccff/deed publish %s|r")
+        :format(def.id, def.id))
     f:Hide()
 end

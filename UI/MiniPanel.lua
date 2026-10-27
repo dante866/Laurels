@@ -64,12 +64,66 @@ function UI:GetFrame()
     return f
 end
 
+-- One-line summary of what a deed counts, for the tooltip.
+local function describeMatch(m)
+    if not m then return "anything" end
+    local parts = {}
+    if m.nameContains then
+        table.insert(parts, ('name has "%s"'):format(m.nameContains))
+    end
+    if m.npcIDs and #m.npcIDs > 0 then
+        table.insert(parts, ("%d NPC ID%s"):format(
+            #m.npcIDs, #m.npcIDs == 1 and "" or "s"))
+    end
+    if m.zone then table.insert(parts, "in " .. m.zone)
+    elseif m.zoneID then table.insert(parts, "in map " .. tostring(m.zoneID)) end
+    return (#parts > 0) and table.concat(parts, ", ") or "anything"
+end
+
+-- The id is the thing you need for /deed publish, reset and rivals, and it is
+-- otherwise only visible via /deed list -- so the row shows it and the tooltip
+-- spells out the commands that want it.
+local function showRowTooltip(row)
+    local t = row.trackerId and ns.Engine:GetTracker(row.trackerId)
+    if not t then return end
+
+    GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(t.name, 1, 1, 1)
+    GameTooltip:AddLine(("ID: %s"):format(t.id), 1, 0.82, 0)
+    GameTooltip:AddLine(" ")
+
+    GameTooltip:AddLine(("Progress: %d"):format(ns.Engine:GetProgress(t.id)), 0.9, 0.9, 0.9)
+    local curTitle = ns.Engine:CurrentTitle(t)
+    GameTooltip:AddLine(("Title: %s"):format(curTitle or "none yet"), 0.9, 0.9, 0.9)
+    local nextTier = ns.Engine:NextTier(t)
+    if nextTier then
+        GameTooltip:AddLine(("Next: %s at %d"):format(nextTier.title, nextTier.count),
+            0.6, 0.6, 0.6)
+    end
+    GameTooltip:AddLine(("Counts: %s"):format(describeMatch(t.match)), 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(("Published: %s"):format(t.published and "yes" or "no"),
+        0.6, 0.6, 0.6)
+
+    GameTooltip:AddLine(" ")
+    if not t.published then
+        GameTooltip:AddLine(("/deed publish %s"):format(t.id), 0.4, 0.8, 1)
+    else
+        GameTooltip:AddLine(("/deed rivals %s"):format(t.id), 0.4, 0.8, 1)
+        GameTooltip:AddLine(("/deed unpublish %s"):format(t.id), 0.4, 0.8, 1)
+    end
+    GameTooltip:AddLine(("/deed reset %s"):format(t.id), 0.4, 0.8, 1)
+    GameTooltip:Show()
+end
+
 local function getRow(f, i)
     local row = f.rows[i]
     if row then return row end
 
     row = CreateFrame("Frame", nil, f)
     row:SetSize(316, 34)
+    row:EnableMouse(true)
+    row:SetScript("OnEnter", showRowTooltip)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
     row.text:SetPoint("TOPLEFT", 0, 0)
@@ -97,6 +151,7 @@ function UI:Refresh()
         row:SetPoint("TOPLEFT", 20, y)
 
         local id = t.id
+        row.trackerId = id
         row.del:SetScript("OnClick", function() ns.Engine:DeleteTracker(id) end)
 
         local count = ns.Engine:GetProgress(t.id)
@@ -109,6 +164,8 @@ function UI:Refresh()
         else
             line = ("%s: %d"):format(t.name, count)
         end
+        -- The id, dimmed: needed for every /deed command that takes one.
+        line = line .. ("  |cff808080[%s]|r"):format(id)
         if nextTier then
             line = line .. ("\n|cff999999   next: %s at %d  (%d to go)|r"):format(
                 nextTier.title, nextTier.count, nextTier.count - count)

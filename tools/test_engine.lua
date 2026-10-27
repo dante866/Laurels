@@ -96,6 +96,31 @@ Engine:DeleteTracker("zoned")
 Engine:ReportProgress({ kind = "kill", name = "Kobold Vermin", zone = "Durotar" })
 check("zoneless tracker ignores the signal's zone", Engine:GetProgress("kobolds") == 1001)
 
+-- Generated ids are typed by hand into /deed publish and friends, so they come
+-- from the deed's name rather than a timestamp blob.
+local boars = Engine:CreateTracker({ name = "Mottled Boars", event = "kill",
+    match = { nameContains = "Mottled Boar" },
+    tiers = { { count = 10, title = "Boar Botherer" } } })
+check("id is a slug of the name", boars.id == "mottledboars")
+
+local boars2 = Engine:CreateTracker({ name = "Mottled Boars!", event = "kill",
+    match = { nameContains = "Mottled Boar" },
+    tiers = { { count = 10, title = "Boar Botherer" } } })
+check("a colliding name gets a suffix", boars2.id == "mottledboars2")
+
+local odd = Engine:CreateTracker({ name = "!!!", event = "kill",
+    match = { nameContains = "x" }, tiers = { { count = 1, title = "X" } } })
+check("an unslugglable name still yields an id", type(odd.id) == "string" and #odd.id > 0)
+
+local given = Engine:CreateTracker({ id = "keepme", name = "Explicit", event = "kill",
+    match = { nameContains = "y" }, tiers = { { count = 1, title = "Y" } } })
+check("an explicit id is left alone", given.id == "keepme")
+
+Engine:DeleteTracker(boars.id)
+Engine:DeleteTracker(boars2.id)
+Engine:DeleteTracker(odd.id)
+Engine:DeleteTracker(given.id)
+
 -- CreateTracker then DeleteTracker.
 local def = Engine:CreateTracker({ name = "Temp", event = "kill",
     match = { nameContains = "Rat" }, tiers = { { count = 5, title = "Ratter" } } })

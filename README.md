@@ -145,6 +145,13 @@ Every matching kill then counts, and the title is yours at 500. Check it
 without farming via `/deed test 500 Murloc`, and `/deed help` prints this same
 worked example in-game. To let others contest the title, `/deed publish <id>`.
 
+**Finding a deed's id.** `publish`, `unpublish`, `rivals` and `reset` all take
+one, so it's shown in three places: dimmed at the end of each row in `/deed`,
+in the hover tooltip on that row (along with the exact commands), and in
+`/deed list`. Creating a deed prints its id too. Ids are derived from the deed
+name — "Mottled Boars" becomes `mottledboars` — so they're typeable; a
+collision gets a numeric suffix.
+
 **Zone scoping (optional).** A deed's `match` can also carry a `zone` (name) or
 `zoneID` (uiMapID), making "Kobolds of Elwynn" a different deed from kobolds
 everywhere. The two are one assertion — *where the kill happened* — so either
