@@ -176,6 +176,32 @@ function Engine:CreateTracker(def)
     return def
 end
 
+-- Apply edits to an existing deed, keeping its id and its progress -- fixing a
+-- typo shouldn't cost you 400 boars.
+--
+-- The id is deliberately immutable: progress lives at charDB.progress[id] and
+-- the rival ladder keys on it, so renaming it would orphan both.
+--
+-- `earned` (the highest tier index reached) is re-resolved rather than left
+-- alone, because tier edits invalidate it in both directions: lowering a
+-- threshold below your count should show that title at once, and deleting
+-- tiers must not leave the index pointing past the end of the list.
+function Engine:UpdateTracker(id, changes)
+    local t = self:GetTracker(id)
+    if not t then return nil end
+
+    if changes.name then t.name = changes.name end
+    if changes.match then t.match = changes.match end
+    if changes.tiers then
+        t.tiers = changes.tiers
+        table.sort(t.tiers, function(a, b) return a.count < b.count end)
+    end
+
+    ns.charDB.earned[id] = self:CurrentTierIndex(t)
+    if ns.UI and ns.UI.Refresh then ns.UI:Refresh() end
+    return t
+end
+
 function Engine:ResetProgress(id)
     ns.charDB.progress[id] = 0
     ns.charDB.earned[id] = 0

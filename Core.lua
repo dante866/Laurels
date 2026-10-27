@@ -139,6 +139,13 @@ SlashCmdList.DEEDKEEPER = function(msg)
     elseif cmd == "new" then
         if ns.AuthorForm then ns.AuthorForm:Open() end
 
+    elseif cmd == "edit" then
+        if rest == "" then
+            ns:Print("usage: /deed edit <trackerId>   (ids show in /deed list)")
+        elseif ns.AuthorForm then
+            ns.AuthorForm:Open(rest)
+        end
+
     elseif cmd == "delete" then
         if rest ~= "" then
             ns.Engine:DeleteTracker(rest)
@@ -272,6 +279,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("commands:")
         ns:Print("  /deed                 toggle the panel")
         ns:Print("  /deed new             open the create-a-deed form")
+        ns:Print("  /deed edit <id>       edit a deed (keeps its progress)")
         ns:Print("  /deed list            list trackers + progress")
         ns:Print("  /deed delete <id>     delete a tracker")
         ns:Print("  /deed reset <id>      reset a tracker's progress")

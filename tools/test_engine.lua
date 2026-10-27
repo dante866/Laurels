@@ -121,6 +121,41 @@ Engine:DeleteTracker(boars2.id)
 Engine:DeleteTracker(odd.id)
 Engine:DeleteTracker(given.id)
 
+-- Editing a deed keeps its id and progress, and re-resolves the earned tier,
+-- which tier edits invalidate in both directions.
+local ed = Engine:CreateTracker({ name = "Boar Hunt", event = "kill",
+    match = { nameContains = "Boar" },
+    tiers = { { count = 100, title = "Boar Hunter" },
+              { count = 500, title = "Boar Slayer" } } })
+for _ = 1, 120 do Engine:ReportProgress({ kind = "kill", name = "Mottled Boar" }) end
+check("edit fixture counted", Engine:GetProgress(ed.id) == 120)
+check("first tier earned", ns.charDB.earned[ed.id] == 1)
+
+Engine:UpdateTracker(ed.id, { name = "Boar Hunting" })
+check("rename keeps the id", Engine:GetTracker(ed.id) ~= nil)
+check("rename applied", Engine:GetTracker(ed.id).name == "Boar Hunting")
+check("rename keeps progress", Engine:GetProgress(ed.id) == 120)
+
+-- Lowering a threshold below the current count should grant that title now.
+Engine:UpdateTracker(ed.id, { tiers = { { count = 10, title = "Boar Hunter" },
+                                        { count = 100, title = "Boar Slayer" } } })
+check("earned re-resolves upward", ns.charDB.earned[ed.id] == 2)
+
+-- Deleting tiers must not leave the earned index past the end of the list.
+Engine:UpdateTracker(ed.id, { tiers = { { count = 10, title = "Boar Hunter" } } })
+check("earned clamps down when tiers go", ns.charDB.earned[ed.id] == 1)
+check("edit did not reset progress", Engine:GetProgress(ed.id) == 120)
+
+-- Changing the match changes what counts from here on.
+Engine:UpdateTracker(ed.id, { match = { nameContains = "Kodo" } })
+Engine:ReportProgress({ kind = "kill", name = "Mottled Boar" })
+check("old match no longer counts", Engine:GetProgress(ed.id) == 120)
+Engine:ReportProgress({ kind = "kill", name = "Ornery Kodo" })
+check("new match counts", Engine:GetProgress(ed.id) == 121)
+
+check("editing an unknown deed is a no-op", Engine:UpdateTracker("nope", {}) == nil)
+Engine:DeleteTracker(ed.id)
+
 -- CreateTracker then DeleteTracker.
 local def = Engine:CreateTracker({ name = "Temp", event = "kill",
     match = { nameContains = "Rat" }, tiers = { { count = 5, title = "Ratter" } } })

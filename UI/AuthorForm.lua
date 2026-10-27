@@ -175,6 +175,14 @@ function AuthorForm:GetFrame()
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -14)
     title:SetText("New Deed")
+    f.titleText = title
+
+    -- Only shown while editing: the id can't change (progress and the rival
+    -- ladder are both keyed on it), so it's stated rather than offered.
+    local idText = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    idText:SetPoint("TOP", 0, -32)
+    idText:Hide()
+    f.idText = idText
 
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -4, -4)
@@ -325,7 +333,10 @@ function AuthorForm:GetFrame()
     cancel:SetSize(110, 24)
     cancel:SetPoint("BOTTOMLEFT", 20, 16)
     cancel:SetText("Cancel")
-    cancel:SetScript("OnClick", function() f:Hide() end)
+    cancel:SetScript("OnClick", function()
+        AuthorForm.editing = nil
+        f:Hide()
+    end)
 
     self.frame = f
     return f
@@ -345,7 +356,31 @@ function AuthorForm:Clear()
     end
 end
 
-function AuthorForm:Open()
+-- Fill the form from an existing deed so editing starts from what's there.
+function AuthorForm:Load(t)
+    local f = self.frame
+    f.nameEdit:SetText(t.name or "")
+
+    local m = t.match or {}
+    f.matchEdit:SetText(m.nameContains or "")
+    f.npcEdit:SetText(m.npcIDs and table.concat(m.npcIDs, ", ") or "")
+
+    if m.zone or m.zoneID then
+        f.zoneChoice = { zone = m.zone, zoneID = m.zoneID }
+        UIDropDownMenu_SetText(f.zoneDrop, m.zone or ("map " .. tostring(m.zoneID)))
+    end
+
+    for i, r in ipairs(f.tierRows) do
+        local tier = t.tiers and t.tiers[i]
+        if tier then
+            r.count:SetText(tostring(tier.count or ""))
+            r.title:SetText(tier.title or "")
+        end
+    end
+end
+
+-- Open blank to author a deed, or pass an id to edit that one in place.
+function AuthorForm:Open(trackerId)
     local f = self:GetFrame()
     -- Rebuilt per open: the zone list needs a loaded map tree, which isn't
     -- guaranteed at addon load, and "Current zone" should follow the player.
@@ -359,7 +394,26 @@ function AuthorForm:Open()
             f.zoneFallback = { zones = flat, chunks = chunkZones(flat) }
         end
     end
+
     self:Clear()
+
+    local existing = trackerId and ns.Engine:GetTracker(trackerId)
+    if trackerId and not existing then
+        ns:Print("no deed with id:", trackerId)
+        return
+    end
+
+    self.editing = existing and existing.id or nil
+    if existing then
+        f.titleText:SetText("Edit Deed")
+        f.idText:SetText(("id: %s \226\128\148 progress is kept"):format(existing.id))
+        f.idText:Show()
+        self:Load(existing)
+    else
+        f.titleText:SetText("New Deed")
+        f.idText:Hide()
+    end
+
     f:Show()
     f.nameEdit:SetFocus()
 end
@@ -405,6 +459,26 @@ function AuthorForm:Save()
     end
     if #tiers == 0 then
         ns:Print("Add at least one tier: a count and a title.")
+        return
+    end
+
+    if self.editing then
+        local t = ns.Engine:UpdateTracker(self.editing,
+            { name = name, match = match, tiers = tiers })
+        if not t then
+            ns:Print("that deed no longer exists \226\128\148 nothing saved.")
+        else
+            ns:Print(("Updated deed: |cffffd100%s|r (%d tier%s)%s. "
+                .. "Progress kept."):format(
+                t.name, #tiers, #tiers == 1 and "" or "s",
+                match.zone and (" in " .. match.zone) or ""))
+            if t.published then
+                ns:Print("  |cffff8800It's published|r \226\128\148 rivals are "
+                    .. "contesting the version they already have.")
+            end
+        end
+        self.editing = nil
+        f:Hide()
         return
     end
 

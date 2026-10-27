@@ -127,12 +127,17 @@ local function getRow(f, i)
 
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
     row.text:SetPoint("TOPLEFT", 0, 0)
-    row.text:SetWidth(284)
+    row.text:SetWidth(238)
     row.text:SetJustifyH("LEFT")
 
     row.del = CreateFrame("Button", nil, row, "UIPanelCloseButton")
     row.del:SetSize(22, 22)
     row.del:SetPoint("TOPRIGHT", 4, 4)
+
+    row.edit = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    row.edit:SetSize(38, 20)
+    row.edit:SetPoint("TOPRIGHT", -22, -1)
+    row.edit:SetText("Edit")
 
     f.rows[i] = row
     return row
@@ -153,6 +158,9 @@ function UI:Refresh()
         local id = t.id
         row.trackerId = id
         row.del:SetScript("OnClick", function() ns.Engine:DeleteTracker(id) end)
+        row.edit:SetScript("OnClick", function()
+            if ns.AuthorForm then ns.AuthorForm:Open(id) end
+        end)
 
         local count = ns.Engine:GetProgress(t.id)
         local curTitle = ns.Engine:CurrentTitle(t)

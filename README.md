@@ -145,6 +145,17 @@ Every matching kill then counts, and the title is yours at 500. Check it
 without farming via `/deed test 500 Murloc`, and `/deed help` prints this same
 worked example in-game. To let others contest the title, `/deed publish <id>`.
 
+**Editing a deed.** Hit **Edit** on its row in `/deed`, or `/deed edit <id>`.
+The form opens populated, and saving **keeps the deed's id and your progress** —
+fixing a typo shouldn't cost you 400 boars.
+
+The id itself can't be changed: progress is stored against it and the rival
+ladder keys on it, so renaming would orphan both. Tier edits re-resolve which
+title you've earned, so lowering a threshold below your count grants that
+title immediately, and deleting tiers can take one back. Editing a *published*
+deed warns you, since rivals are still contesting the version they have —
+until M4, definitions don't propagate.
+
 **Finding a deed's id.** `publish`, `unpublish`, `rivals` and `reset` all take
 one, so it's shown in three places: dimmed at the end of each row in `/deed`,
 in the hover tooltip on that row (along with the exact commands), and in
