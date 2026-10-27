@@ -56,8 +56,9 @@ regardless while you correct the number.
       same-name collisions and a client logging itself as its own rival
 - [x] **Adaptive transport** — the broadcast channel is negotiated per client
       rather than hardcoded, with built-in send throttling
-- [ ] M4 published-deed definition sync (DEFPUB adopt) — currently two clients must
-      share the same `uuid`; adoption makes that automatic
+- [x] **M4 published-deed sync** (`DEFPUB`) — definitions travel, so a rival
+      sees a challenge by name under **Nearby** and accepts it in one click,
+      getting the author's exact match rules and thresholds
 - [ ] M5 holder/rank in the panel UI + steal toasts
 
 ⚠️ **Never tested between two real clients.** Every test is headless against a
@@ -145,24 +146,23 @@ Every matching kill then counts, and the title is yours at 500. Check it
 without farming via `/deed test 500 Murloc`, and `/deed help` prints this same
 worked example in-game. To let others contest the title, `/deed publish <id>`.
 
-**Competing with someone.** Two clients only contest the same deed if they
-compute the same ladder key, and publishing assigns a random **challenge id**
-that becomes that key. Killing the same mobs is *not* enough — a rival's own
-boar deed has a different id, and the two would never see each other.
+**Competing with someone.** Publish a deed and nearby players can accept it:
 
-1. You: `/deed publish boarsmustdie` → prints a challenge id like `D-6f2a-91c3`
-2. Them: make a deed that counts the same mobs (`/deed new`)
-3. Them: `/deed adopt <theirDeedId> D-6f2a-91c3`
-4. Both kill things, in `YELL` range of each other
+1. You: `/deed publish boarsmustdie`
+2. Them: **Nearby** button in `/deed` (or `/deed nearby`) → your deed is listed
+   by name, with its tiers in the tooltip → **Accept**
+3. Both kill things, within `YELL` range of each other
 
-The id is also in the deed's hover tooltip once published, so you don't have
-to re-publish to read it.
+Accepting builds the deed from **your** definition — the same match rules and
+the same thresholds — so the two of you are provably counting the same thing.
+Nobody types a challenge id.
 
-Each side's **match rules and tier titles stay local** — only counts and tier
-*numbers* travel. If their thresholds differ from yours, you'll each see the
-same rival described with your own tier names. M4 (`DEFPUB`) replaces this by
-sending the definition itself, so adopting becomes one click and definitions
-can't drift.
+Definitions travel on publish and whenever a client says hello, so someone
+logging in later picks up what's already out there; **Ask Again** re-requests
+on demand.
+
+`/deed adopt <yourDeedId> <challengeId>` still exists for pasting an id
+directly, but **Nearby** is the easy path.
 
 **Editing a deed.** Hit **Edit** on its row in `/deed`, or `/deed edit <id>`.
 The form opens populated, and saving **keeps the deed's id and your progress** —

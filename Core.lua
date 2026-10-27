@@ -75,6 +75,8 @@ local DEFAULT_TRACKERS = {
 local function initDB()
     DeedkeeperDB = DeedkeeperDB or {}
     DeedkeeperDB.trackers = DeedkeeperDB.trackers or deepcopy(DEFAULT_TRACKERS)
+    -- Deeds heard published by others but not adopted. Offers, not trackers.
+    DeedkeeperDB.known = DeedkeeperDB.known or {}
 
     DeedkeeperCharDB = DeedkeeperCharDB or {}
     DeedkeeperCharDB.progress = DeedkeeperCharDB.progress or {}  -- trackerId -> count
@@ -167,11 +169,16 @@ SlashCmdList.DEEDKEEPER = function(msg)
             -- Until M4 carries definitions over the wire, a rival has to be
             -- told the challenge id out of band. Print the exact command so
             -- it can be pasted straight into chat.
-            ns:Print("  Rivals need a deed matching the same mobs, then:")
-            ns:Print(("  |cff66ccff/deed adopt <theirDeedId> %s|r"):format(t.uuid))
+            ns:Print("  Rivals nearby will see it under |cff66ccff/deed nearby|r.")
             ns.Rival:RecordOwnClaim(t)
+            -- Send the definition, not just the claim: that is what lets a
+            -- rival accept it by name instead of being told a uuid by hand.
+            ns.Rival:BroadcastDef(t)
             ns.Rival:ForceBroadcast(t)
         end
+
+    elseif cmd == "nearby" then
+        if ns.Nearby then ns.Nearby:Toggle() end
 
     elseif cmd == "adopt" then
         -- Accept someone else's challenge: point one of your deeds at their
@@ -335,8 +342,9 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed delete <id>     delete a tracker")
         ns:Print("  /deed reset <id>      reset a tracker's progress")
         ns:Print("  /deed publish <id>    publish a deed so others can contest it")
+        ns:Print("  /deed nearby          browse challenges published nearby")
         ns:Print("  /deed adopt <id> <challengeId>")
-        ns:Print("                        accept someone else's published challenge")
+        ns:Print("                        accept a challenge by id (/deed nearby is easier)")
         ns:Print("  /deed unpublish <id>  stop broadcasting a deed")
         ns:Print("  /deed rivals <id>     show the leaderboard for a deed")
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")

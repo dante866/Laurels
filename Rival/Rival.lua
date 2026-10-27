@@ -19,6 +19,16 @@ Rival.lastHolder = {}     -- deedKey -> guid of the last known holder
 Rival.lastHolderName = {} -- deedKey -> that holder's display name
 Rival._bcast = {}
 
+-- A local copy helper rather than ns.deepcopy, which lives in Core.lua -- the
+-- headless suites load only Engine/Ladder/Comm/Rival, and this file stays in
+-- that set. An adopted deed must not share tables with the heard definition.
+local function copy(v)
+    if type(v) ~= "table" then return v end
+    local out = {}
+    for k, x in pairs(v) do out[k] = copy(x) end
+    return out
+end
+
 local function genUUID()
     return string.format("D-%x-%x", (time and time()) or os.time(), math.random(0, 0xffffff))
 end
@@ -166,7 +176,82 @@ function Rival:OnLocalProgress(tracker)
     end
 end
 
+-- Published-deed discovery (M4) ---------------------------------------------
+
+-- Deeds we've heard published by other players but haven't adopted. Stored
+-- account-wide and separately from ns.db.trackers: these are offers, not
+-- things being tracked, and the engine must not iterate them.
+function Rival:KnownDeeds()
+    ns.db.known = ns.db.known or {}
+    return ns.db.known
+end
+
+-- Have we already got a tracker contesting this challenge?
+function Rival:AdoptedUUID(uuid)
+    for _, t in ipairs(ns.db.trackers) do
+        if t.uuid == uuid then return t end
+    end
+end
+
+-- Offers worth showing: everything heard that we aren't already contesting.
+function Rival:NearbyDeeds()
+    local out = {}
+    for uuid, d in pairs(self:KnownDeeds()) do
+        if not self:AdoptedUUID(uuid) then
+            out[#out + 1] = d
+        end
+    end
+    table.sort(out, function(a, b)
+        return (a.name or "") < (b.name or "")
+    end)
+    return out
+end
+
+function Rival:BroadcastDef(tracker)
+    if not self:ShouldBroadcast(tracker) or not tracker.uuid then return end
+    ns.Comm:Send({ type = "DEFPUB", guid = self:MyGuid(), ver = ns.version,
+        def = {
+            uuid = tracker.uuid, name = tracker.name,
+            event = tracker.event, match = tracker.match, tiers = tracker.tiers,
+        } })
+end
+
+-- Turn a heard definition into a real tracker. This is what "Accept" does,
+-- and taking the author's own match and tiers is the point: both sides then
+-- count the same things against the same thresholds, which hand-copying a
+-- uuid never guaranteed.
+function Rival:Adopt(uuid)
+    local existing = self:AdoptedUUID(uuid)
+    if existing then return existing, "already adopted" end
+
+    local d = self:KnownDeeds()[uuid]
+    if not d then return nil, "no such deed heard nearby" end
+
+    local t = ns.Engine:CreateTracker({
+        name = d.name, event = d.event or "kill",
+        match = copy(d.match or {}),
+        tiers = copy(d.tiers or {}),
+        uuid = uuid, published = true, origin = d.origin,
+    })
+    self:RecordOwnClaim(t)
+    self:ForceBroadcast(t)
+    return t
+end
+
 -- Handlers -----------------------------------------------------------------
+
+function Rival:OnDefPub(msg)
+    local d = msg.def
+    if not d or not d.uuid then return end
+    -- Our own published deeds come back to us on a shared channel; they are
+    -- not offers. AdoptedUUID covers that and the already-accepted case alike.
+    if self:AdoptedUUID(d.uuid) then return end
+
+    d.origin = msg.name or msg.sender
+    d.seen = self:Now()
+    self:KnownDeeds()[d.uuid] = d
+    if ns.UI and ns.UI.RefreshNearby then ns.UI:RefreshNearby() end
+end
 
 function Rival:OnClaim(msg)
     local key = msg.deedKey
@@ -181,9 +266,13 @@ function Rival:OnClaim(msg)
 end
 
 function Rival:OnHello()
-    -- A newcomer appeared: resend our standing for each published deed.
+    -- A newcomer appeared: resend each published deed's definition and our
+    -- standing on it, so they can both see the offer and place us on it.
     for _, t in ipairs(ns.db.trackers) do
-        if self:ShouldBroadcast(t) then self:ForceBroadcast(t) end
+        if self:ShouldBroadcast(t) then
+            self:BroadcastDef(t)
+            self:ForceBroadcast(t)
+        end
     end
 end
 
@@ -201,6 +290,7 @@ function Rival:WireHandlers()
     ns.Comm:On("CLAIM", function(m) self:OnClaim(m) end)
     ns.Comm:On("HELLO", function(m) self:OnHello(m) end)
     ns.Comm:On("ASK", function(m) self:OnAsk(m) end)
+    ns.Comm:On("DEFPUB", function(m) self:OnDefPub(m) end)
 end
 
 function Rival:Init()

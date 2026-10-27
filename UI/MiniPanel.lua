@@ -46,11 +46,20 @@ function UI:GetFrame()
 
     local newBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     newBtn:SetSize(110, 24)
-    newBtn:SetPoint("BOTTOM", 0, 14)
+    newBtn:SetPoint("BOTTOMLEFT", 20, 14)
     newBtn:SetText("New Deed")
     newBtn:SetScript("OnClick", function()
         if ns.AuthorForm then ns.AuthorForm:Open() end
     end)
+
+    local nearbyBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    nearbyBtn:SetSize(110, 24)
+    nearbyBtn:SetPoint("BOTTOMRIGHT", -20, 14)
+    nearbyBtn:SetText("Nearby")
+    nearbyBtn:SetScript("OnClick", function()
+        if ns.Nearby then ns.Nearby:Toggle() end
+    end)
+    f.nearbyBtn = nearbyBtn
 
     local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
     empty:SetPoint("CENTER", 0, 10)
@@ -197,6 +206,18 @@ function UI:Refresh()
 
     if f.empty then
         if i == 0 then f.empty:Show() else f.empty:Hide() end
+    end
+    self:RefreshNearby()
+end
+
+-- Called by the rival layer when a new published deed is heard, so an open
+-- Nearby panel fills in live rather than needing a reopen.
+function UI:RefreshNearby()
+    if ns.Nearby then ns.Nearby:Refresh() end
+    if self.frame and self.frame:IsShown() and self.frame.nearbyBtn then
+        local pending = #ns.Rival:NearbyDeeds()
+        self.frame.nearbyBtn:SetText(pending > 0
+            and ("Nearby (%d)"):format(pending) or "Nearby")
     end
 end
 

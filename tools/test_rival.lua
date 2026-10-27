@@ -169,5 +169,50 @@ farm(P, "Kobold", 10)
 check("an unpublished deed broadcasts nothing",
     Q.ns.Ladder:GetHolder(PKEY) == nil)
 
+-- 10. M4: a published deed's DEFINITION travels, so a rival discovers it by
+-- name and accepts it, instead of being told a uuid out of band.
+local Author = makeClient("Author")
+local Taker  = makeClient("Taker")
+-- The taker starts with no deed at all -- discovery has to supply everything.
+Taker.ns.db.trackers = {}
+Author.ns.db.trackers[1].published = true
+connect({ Author, Taker })
+
+Author.ns.Rival:BroadcastDef(Author.ns.db.trackers[1])
+local offers = Taker.ns.Rival:NearbyDeeds()
+check("the taker heard one offer", #offers == 1)
+check("with the author's deed name", offers[1] and offers[1].name == "Kobold Slaying")
+check("and the author's tiers", offers[1] and #offers[1].tiers == 2)
+check("and the author's match",
+    offers[1] and offers[1].match.nameContains == "Kobold")
+check("credited to the author", offers[1] and offers[1].origin ~= nil)
+
+local adopted = Taker.ns.Rival:Adopt(KEY)
+check("accepting builds a real tracker", adopted ~= nil)
+check("it carries the challenge id", adopted and adopted.uuid == KEY)
+check("it copies the author's thresholds",
+    adopted and adopted.tiers[1].count == 1000)
+check("it is no longer offered", #Taker.ns.Rival:NearbyDeeds() == 0)
+check("accepting twice is a no-op",
+    select(2, Taker.ns.Rival:Adopt(KEY)) == "already adopted")
+
+-- The author must not be offered their own deed back off the shared channel.
+check("the author is not offered their own deed",
+    #Author.ns.Rival:NearbyDeeds() == 0)
+
+-- And now the two actually compete, with no uuid ever typed by hand.
+farm(Taker, "Kobold", 1200)
+check("the taker now holds it on the author's client",
+    Author.ns.Ladder:GetHolder(KEY).name == "Taker")
+
+-- An oversized definition sheds tiers rather than failing to send.
+local long = { uuid = "u", name = string.rep("N", 60), event = "kill",
+    match = { nameContains = string.rep("m", 40) }, tiers = {} }
+for i = 1, 5 do
+    long.tiers[i] = { count = i * 1000, title = string.rep("T", 40) }
+end
+local body = Author.ns.Comm:EncodeDef({ def = long, guid = "g", ver = "1" })
+check("an oversized definition is trimmed to fit", #body <= Author.ns.Comm.MAX_BODY)
+
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

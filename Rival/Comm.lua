@@ -140,7 +140,43 @@ function Comm:Encode(msg)
             esc(msg.guid) }, "|")
     elseif t == "ASK" then
         return table.concat({ self.PROTO, "ASK", esc(msg.deedKey) }, "|")
+    elseif t == "DEFPUB" then
+        return self:EncodeDef(msg)
     end
+end
+
+-- DEFPUB carries a whole deed definition, not just a claim, so a rival can
+-- adopt it without being told a uuid by hand. Layout is a fixed header then
+-- variable count/title pairs:
+--   DEFPUB|uuid|guid|ver|name|event|nameContains|npcIDs|zone|zoneID|c|t|c|t...
+--
+-- Addon messages are capped at 255 bytes, and an over-long one fails to send
+-- with a result code we would misread as the channel refusing us. So the
+-- encoder measures itself and sheds trailing tiers until it fits.
+Comm.MAX_BODY = 240
+
+function Comm:EncodeDef(msg, tierLimit)
+    local d = msg.def or {}
+    local m = d.match or {}
+    local parts = {
+        self.PROTO, "DEFPUB", esc(d.uuid), esc(msg.guid), esc(msg.ver),
+        esc(d.name), esc(d.event or "kill"),
+        esc(m.nameContains),
+        esc(m.npcIDs and table.concat(m.npcIDs, ",") or ""),
+        esc(m.zone), tostring(m.zoneID or ""),
+    }
+    local tiers = d.tiers or {}
+    local limit = math.min(tierLimit or #tiers, #tiers)
+    for i = 1, limit do
+        parts[#parts + 1] = tostring(tiers[i].count or 0)
+        parts[#parts + 1] = esc(tiers[i].title)
+    end
+
+    local body = table.concat(parts, "|")
+    if #body > self.MAX_BODY and limit > 1 then
+        return self:EncodeDef(msg, limit - 1) -- shed a tier and remeasure
+    end
+    return body
 end
 
 function Comm:Decode(body)
@@ -158,6 +194,43 @@ function Comm:Decode(body)
             guid = orNil(unesc(f[8])) }
     elseif t == "ASK" then
         return { proto = proto, type = "ASK", deedKey = unesc(f[3]) }
+    elseif t == "DEFPUB" then
+        local m = {}
+        local nameContains = orNil(unesc(f[8]))
+        if nameContains then m.nameContains = nameContains end
+
+        local ids = orNil(unesc(f[9]))
+        if ids then
+            local list = {}
+            for tok in string.gmatch(ids, "[^,]+") do
+                local n = tonumber(tok)
+                if n then list[#list + 1] = n end
+            end
+            if #list > 0 then m.npcIDs = list end
+        end
+
+        local zone = orNil(unesc(f[10]))
+        if zone then m.zone = zone end
+        local zoneID = tonumber(f[11])
+        if zoneID then m.zoneID = zoneID end
+
+        local tiers = {}
+        local i = 12
+        while f[i] and f[i + 1] do
+            local count = tonumber(f[i])
+            local title = unesc(f[i + 1])
+            if count and title ~= "" then
+                tiers[#tiers + 1] = { count = count, title = title }
+            end
+            i = i + 2
+        end
+
+        return { proto = proto, type = "DEFPUB",
+            uuid = orNil(unesc(f[3])), guid = orNil(unesc(f[4])),
+            ver = unesc(f[5]),
+            def = { uuid = orNil(unesc(f[3])), name = unesc(f[6]),
+                    event = orNil(unesc(f[7])) or "kill",
+                    match = m, tiers = tiers } }
     end
     return { proto = proto, type = t }
 end
@@ -192,6 +265,16 @@ end
 function Comm:Send(msg, channel, target)
     local body = self:Encode(msg)
     if not body or not self.transport then return end
+    -- Never hand the client an over-long body: it fails with a result code
+    -- the fallback logic would misread as this channel being refused, and we
+    -- would switch transports over a message that was simply too big.
+    if #body > self.MAX_BODY then
+        if ns.Print then
+            ns:Print(("|cffff8800Skipped an oversized %s message (%d bytes).|r")
+                :format(tostring(msg.type), #body))
+        end
+        return
+    end
     -- Channel resolution is the transport's job, so this stays pure and the
     -- headless tests can swap in a fake that ignores `channel` entirely.
     self.transport:Send(self.PREFIX, body, channel or self:BroadcastChannel(), target)
