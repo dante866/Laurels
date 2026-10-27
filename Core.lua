@@ -162,9 +162,44 @@ SlashCmdList.DEEDKEEPER = function(msg)
             t.published = true
             t.uuid = t.uuid or ns.genUUID()
             t.origin = t.origin or ns.Rival:MyName()
-            ns:Print(("published '%s' (shared id %s). Nearby addon users can now contest it.")
+            ns:Print(("published |cffffd100%s|r \226\128\148 challenge id |cffffd100%s|r")
                 :format(t.name, t.uuid))
+            -- Until M4 carries definitions over the wire, a rival has to be
+            -- told the challenge id out of band. Print the exact command so
+            -- it can be pasted straight into chat.
+            ns:Print("  Rivals need a deed matching the same mobs, then:")
+            ns:Print(("  |cff66ccff/deed adopt <theirDeedId> %s|r"):format(t.uuid))
+            ns.Rival:RecordOwnClaim(t)
             ns.Rival:ForceBroadcast(t)
+        end
+
+    elseif cmd == "adopt" then
+        -- Accept someone else's challenge: point one of your deeds at their
+        -- challenge id so both clients compute the same ladder key.
+        --
+        -- This is the manual half of M4. DEFPUB will carry the definition
+        -- itself so the id never has to be passed around by hand.
+        local id, uuid = rest:match("^(%S+)%s+(%S+)$")
+        if not id then
+            ns:Print("usage: /deed adopt <yourDeedId> <challengeId>")
+            ns:Print("  the challenge id comes from whoever published it")
+            ns:Print("  your deed must already count the same mobs")
+        else
+            local t = ns.Engine:GetTracker(id)
+            if not t then
+                ns:Print("no deed with id:", id)
+            else
+                t.uuid = uuid
+                t.published = true
+                t.origin = t.origin or "adopted"
+                ns.Rival:RecordOwnClaim(t)
+                ns:Print(("|cffffd100%s|r now contests challenge %s."):format(
+                    t.name, uuid))
+                ns:Print(("  your count: %d \226\128\148 see the ladder with "
+                    .. "|cff66ccff/deed rivals %s|r"):format(
+                    ns.Engine:GetProgress(t.id), t.id))
+                ns.Rival:ForceBroadcast(t)
+            end
         end
 
     elseif cmd == "unpublish" then
@@ -300,6 +335,8 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed delete <id>     delete a tracker")
         ns:Print("  /deed reset <id>      reset a tracker's progress")
         ns:Print("  /deed publish <id>    publish a deed so others can contest it")
+        ns:Print("  /deed adopt <id> <challengeId>")
+        ns:Print("                        accept someone else's published challenge")
         ns:Print("  /deed unpublish <id>  stop broadcasting a deed")
         ns:Print("  /deed rivals <id>     show the leaderboard for a deed")
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")

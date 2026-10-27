@@ -103,6 +103,11 @@ local function showRowTooltip(row)
     GameTooltip:AddLine(("Counts: %s"):format(describeMatch(t.match)), 0.6, 0.6, 0.6)
     GameTooltip:AddLine(("Published: %s"):format(t.published and "yes" or "no"),
         0.6, 0.6, 0.6)
+    if t.published and t.uuid then
+        -- The id a rival needs to adopt to contest this deed. Until M4 it
+        -- travels by hand, so it has to be readable somewhere.
+        GameTooltip:AddLine(("Challenge id: %s"):format(t.uuid), 1, 0.82, 0)
+    end
 
     GameTooltip:AddLine(" ")
     if not t.published then
