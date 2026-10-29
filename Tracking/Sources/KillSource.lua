@@ -28,10 +28,23 @@ local function getZone()
 end
 
 local function getNpcID(guid)
-    if not guid then return nil end
-    -- Retail GUID: "Creature-0-serverID-instanceID-zoneUID-NPCID-spawnUID"
-    local npcID = select(6, strsplit("-", guid))
-    return tonumber(npcID)
+    if type(guid) ~= "string" then return nil end
+    -- Two GUID formats span the clients Deedkeeper targets:
+    --   * WoD+ dash form:  "Creature-0-serverID-instanceID-zoneUID-NPCID-spawnUID"
+    --   * pre-WoD hex form: "0x<typebits><entry><spawn>" (e.g. Mists 5.x)
+    -- Only npcID-matched deeds need this; name-matched deeds use destName and
+    -- are unaffected either way.
+    if guid:find("-", 1, true) then
+        return tonumber((select(6, strsplit("-", guid))))
+    end
+    -- Legacy hex GUID: the creature entry sits in bytes 4-6 (hex chars 7-12).
+    -- VERIFY this offset against a real Forever GUID before trusting npcID
+    -- matches on the legacy client; the layout is client-specific.
+    local hex = guid:match("^0[xX](%x+)$")
+    if hex and #hex >= 12 then
+        return tonumber(hex:sub(7, 12), 16)
+    end
+    return nil
 end
 
 function KillSource:Init(engine)
@@ -41,14 +54,29 @@ function KillSource:Init(engine)
     local f = CreateFrame("Frame")
     self.frame = f
     f:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-    f:SetScript("OnEvent", function()
-        self:OnCombatLog()
+    f:SetScript("OnEvent", function(_, event, ...)
+        self:OnCombatLog(event, ...)
     end)
 end
 
-function KillSource:OnCombatLog()
-    local _, subevent, _, sourceGUID, _, _, _, destGUID, destName =
-        CombatLogGetCurrentEventInfo()
+function KillSource:OnCombatLog(event, ...)
+    -- Read the combat-log payload portably. Pre-Legion clients (our interface
+    -- 16001 / Mists targets) deliver it as the event's varargs; Legion+ clients
+    -- deliver nothing here and require CombatLogGetCurrentEventInfo(). Prefer the
+    -- varargs when present so this works without that retail-only global.
+    local subevent, sourceGUID, destGUID, destName
+    if select("#", ...) > 0 then
+        local _hideCaster, _sourceName, _sourceFlags, _sourceRaidFlags, _destFlags
+        local _timestamp
+        _timestamp, subevent, _hideCaster, sourceGUID, _sourceName, _sourceFlags,
+            _sourceRaidFlags, destGUID, destName = ...
+    elseif CombatLogGetCurrentEventInfo then
+        local _
+        _, subevent, _, sourceGUID, _, _, _, destGUID, destName =
+            CombatLogGetCurrentEventInfo()
+    else
+        return
+    end
 
     if subevent ~= "PARTY_KILL" then return end
 
