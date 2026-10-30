@@ -103,6 +103,22 @@ local function titleFor(tracker, tierIndex)
     return Rival:TitleFor(tracker, tierIndex)
 end
 
+-- A title changed hands, in one of the two directions that involve us.
+--
+-- Both outputs on purpose: chat is the durable log you can scroll back to,
+-- the toast is the moment. A steal tends to land mid-combat, which is exactly
+-- when a chat line disappears unread. The toast is optional at runtime, so
+-- the headless suites (which load no UI) still exercise this path.
+function Rival:AnnounceSteal(kind, title, who, count)
+    if kind == "took" then
+        ns:Print(("You took |cffffd100%s|r from %s!"):format(title, who or "someone"))
+    else
+        ns:Print(("%s took |cffffd100%s|r from you! (they have %d)")
+            :format(who or "Someone", title, count or 0))
+    end
+    if ns.Toast then ns.Toast:Steal(kind, title, who, count) end
+end
+
 -- Recompute the holder for a deed and announce if the title changed hands.
 function Rival:AfterLadderChange(key, tracker)
     tracker = tracker or self:FindTracker(key)
@@ -119,11 +135,9 @@ function Rival:AfterLadderChange(key, tracker)
         local title = titleFor(tracker, holder.tier) or (tracker and tracker.name) or key
         local me = self:MyGuid()
         if newGuid == me and prevGuid and prevGuid ~= me then
-            ns:Print(("You took |cffffd100%s|r from %s!")
-                :format(title, prevName or "someone"))
+            self:AnnounceSteal("took", title, prevName, holder.count)
         elseif prevGuid == me and newGuid ~= me then
-            ns:Print(("%s took |cffffd100%s|r from you! (they have %d)")
-                :format(holder.name or "Someone", title, holder.count))
+            self:AnnounceSteal("lost", title, holder.name, holder.count)
         end
     end
 

@@ -75,7 +75,8 @@ regardless while you correct the number.
       real receive path, so stealing can be tested without a second player
 - [x] **M5.1 holder + rank in the panel** — published deeds show who holds the
       title and where you stand; the row tooltip carries the full ladder
-- [ ] M5.2 steal toasts — a steal is still only a chat line
+- [x] **M5.2 steal toasts** — a title changing hands shows on screen, not just
+      in chat where it scrolls past mid-fight. `/deed toasts on|off|quiet|test`
 
 ⚠️ **Never tested between two real clients.** Every test is headless against a
 fake bus. Messages provably leave and your own come back, but no other
@@ -116,6 +117,10 @@ without a second player:
 /deed simrival boarsmustdie 25 Thrall    they take it off you
 /deed test 30 Mottled Boar               you take it back
 ```
+
+Each change of hands raises an on-screen toast as well as the chat line.
+`/deed toasts test` previews both without needing a rival; `off` or `quiet`
+if they get in the way.
 
 Known limitations (by design, see `docs/rival-layer.md` §5):
 - The rate cap only catches *acceleration* of a known rival; a brand-new contact's

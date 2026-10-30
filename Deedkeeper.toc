@@ -29,3 +29,4 @@ Rival\Rival.lua
 UI\MiniPanel.lua
 UI\AuthorForm.lua
 UI\NearbyPanel.lua
+UI\Toast.lua

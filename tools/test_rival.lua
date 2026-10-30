@@ -254,5 +254,26 @@ farm(Lone, "Kobold", 50000)
 check("we hold it again", Lone.ns.Ladder:GetHolder(KEY).name == "Lone")
 check("and were told we took it", has(Lone, "You took"))
 
+-- 12. Steals announce through one path, so chat and the toast can't drift
+-- apart. The toast layer is optional -- no UI is loaded here -- and the
+-- announcement must still happen without it.
+local Ann = makeClient("Ann")
+local seen = {}
+Ann.ns.Toast = { Steal = function(_, kind, title, who, count)
+    seen[#seen + 1] = { kind = kind, title = title, who = who, count = count }
+end }
+
+farm(Ann, "Kobold", 1000)
+Ann.ns.Rival:SimulateClaim(Ann.ns.db.trackers[1], "Garrosh", 2000)
+check("losing a title toasts", #seen == 1 and seen[1].kind == "lost")
+check("the toast names the title", seen[1] and seen[1].title == "Kobold Slayer")
+check("and names the rival", seen[1] and seen[1].who == "Garrosh")
+check("and carries their count", seen[1] and seen[1].count == 2000)
+check("chat said so too", has(Ann, "took") and has(Ann, "from you"))
+
+farm(Ann, "Kobold", 2000) -- 3000, we take it back
+check("taking it back toasts", #seen == 2 and seen[2].kind == "took")
+check("naming who we took it from", seen[2] and seen[2].who == "Garrosh")
+
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

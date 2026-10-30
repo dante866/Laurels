@@ -177,6 +177,29 @@ SlashCmdList.DEEDKEEPER = function(msg)
             ns.Rival:ForceBroadcast(t)
         end
 
+    elseif cmd == "toasts" then
+        local want = rest:gsub("^%s+", ""):gsub("%s+$", ""):lower()
+        if want == "off" then
+            ns.db.toasts = false
+            ns:Print("steal toasts off. Chat announcements still happen.")
+        elseif want == "on" then
+            ns.db.toasts = true
+            ns.db.toastSound = true
+            ns:Print("steal toasts on.")
+        elseif want == "quiet" then
+            ns.db.toasts = true
+            ns.db.toastSound = false
+            ns:Print("steal toasts on, without sound.")
+        elseif want == "test" and ns.Toast then
+            ns.Toast:Steal("took", "Boar Smasher", "Thrall", 1500)
+            ns.Toast:Steal("lost", "Boar Smasher", "Thrall", 1600)
+        else
+            ns:Print(("toasts are %s%s"):format(
+                (ns.db.toasts == false) and "off" or "on",
+                (ns.db.toastSound == false) and ", muted" or ""))
+            ns:Print("  /deed toasts on | off | quiet | test")
+        end
+
     elseif cmd == "simrival" then
         -- Fake a rival so the steal mechanic can be exercised solo.
         local id, count, name = rest:match("^(%S+)%s+(%d+)%s+(.+)$")
@@ -380,6 +403,8 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed commtest        test whether addon messages work (diagnostic)")
         ns:Print("  /deed simrival <id> <count> <name>")
         ns:Print("                        fake a rival, to test stealing solo")
+        ns:Print("  /deed toasts [on|off|quiet|test]")
+        ns:Print("                        steal pop-ups: show, mute or preview")
         ns:Print("  /deed channel [type]  show or set the broadcast channel")
         ns:Print("  /deed test <n> <name> simulate n kills of <name> (for testing)")
         ns:Print(" ")
