@@ -63,5 +63,12 @@ check("count went back to zero", L:GetHolder("sec").count == 0)
 check("Bob ranks #1", (select(1, L:GetRank("kob", "G-B"))) == 1)
 check("Alice ranks #2", (select(1, L:GetRank("kob", "G-A"))) == 2)
 
+-- Someone with no claim has no rank, but the total is still reported. The
+-- panel relies on this: it must say how many rivals there are rather than
+-- inventing a position for a player who isn't on the board.
+local rank, total = L:GetRank("kob", "G-NOBODY")
+check("an unranked player has no rank", rank == nil)
+check("but the total still comes back", total == 2)
+
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

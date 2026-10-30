@@ -71,7 +71,11 @@ regardless while you correct the number.
 - [x] **M4 published-deed sync** (`DEFPUB`) — definitions travel, so a rival
       sees a challenge by name under **Nearby** and accepts it in one click,
       getting the author's exact match rules and thresholds
-- [ ] M5 holder/rank in the panel UI + steal toasts
+- [x] **M5.0 simulated rivals** — `/deed simrival` fakes a claim through the
+      real receive path, so stealing can be tested without a second player
+- [x] **M5.1 holder + rank in the panel** — published deeds show who holds the
+      title and where you stand; the row tooltip carries the full ladder
+- [ ] M5.2 steal toasts — a steal is still only a chat line
 
 ⚠️ **Never tested between two real clients.** Every test is headless against a
 fake bus. Messages provably leave and your own come back, but no other

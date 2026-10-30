@@ -9,6 +9,13 @@ local addonName, ns = ...
 local UI = {}
 ns.UI = UI
 
+-- The panel resizes to its contents, because rows are no longer a fixed
+-- height: a published deed carries a holder/rank line that an unpublished one
+-- doesn't. Bounded so it neither collapses nor runs off the screen.
+local MIN_HEIGHT  = 220
+local MAX_HEIGHT  = 520
+local MAX_CONTENT = MAX_HEIGHT - 110 -- room for the title and the buttons
+
 function UI:Init()
     -- Frame created lazily on first Toggle().
 end
@@ -68,6 +75,11 @@ function UI:GetFrame()
     empty:Hide()
     f.empty = empty
 
+    local more = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    more:SetPoint("BOTTOM", 0, 44)
+    more:Hide()
+    f.more = more
+
     f.rows = {}
     self.frame = f
     return f
@@ -113,9 +125,33 @@ local function showRowTooltip(row)
     GameTooltip:AddLine(("Published: %s"):format(t.published and "yes" or "no"),
         0.6, 0.6, 0.6)
     if t.published and t.uuid then
-        -- The id a rival needs to adopt to contest this deed. Until M4 it
-        -- travels by hand, so it has to be readable somewhere.
+        -- The id a rival needs to adopt to contest this deed. Reachable from
+        -- the Nearby panel now, but still worth being able to read directly.
         GameTooltip:AddLine(("Challenge id: %s"):format(t.uuid), 1, 0.82, 0)
+    end
+
+    -- The ladder itself, so checking where you stand doesn't mean typing
+    -- /deed rivals every time.
+    if t.published and ns.Rival and ns.Ladder then
+        local key = ns.Rival:KeyFor(t)
+        local board = ns.Ladder:GetStandings(key)
+        if #board > 0 then
+            local myGuid = ns.Rival:MyGuid()
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("Ladder:", 1, 1, 1)
+            for i = 1, math.min(#board, 5) do
+                local e = board[i]
+                local mine = (e.guid == myGuid)
+                GameTooltip:AddLine(
+                    ("  %d. %s \226\128\148 %d%s"):format(
+                        i, e.name or "?", e.count or 0, mine and "  (you)" or ""),
+                    mine and 0.2 or 0.8, mine and 1 or 0.8, mine and 0.2 or 0.8)
+            end
+            if #board > 5 then
+                GameTooltip:AddLine(("  \226\128\166 and %d more"):format(#board - 5),
+                    0.6, 0.6, 0.6)
+            end
+        end
     end
 
     GameTooltip:AddLine(" ")
@@ -127,6 +163,36 @@ local function showRowTooltip(row)
     end
     GameTooltip:AddLine(("/deed reset %s"):format(t.id), 0.4, 0.8, 1)
     GameTooltip:Show()
+end
+
+-- Who holds a published deed and where we sit on it. Returns nil for an
+-- unpublished deed, which has no ladder to report -- that is what makes rows
+-- vary in height rather than all carrying a blank third line.
+local function standingsLine(t)
+    if not t.published or not (ns.Rival and ns.Ladder) then return nil end
+
+    local key = ns.Rival:KeyFor(t)
+    local holder = ns.Ladder:GetHolder(key)
+    if not holder then return nil end
+
+    local myGuid = ns.Rival:MyGuid()
+    local rank, total = ns.Ladder:GetRank(key, myGuid)
+
+    if (total or 0) <= 1 then
+        return "|cff999999   you hold it \226\128\148 no rivals yet|r"
+    end
+    if holder.guid == myGuid then
+        return ("|cff00ff00   you hold it|r|cff999999   (#%d of %d)|r")
+            :format(rank or 1, total)
+    end
+    -- GetRank returns nil when we have no claim on this deed yet. Say how
+    -- many rivals there are rather than inventing a rank for ourselves.
+    if not rank then
+        return ("|cffff8800   %s holds it|r|cff999999  %d   (%d on the ladder)|r")
+            :format(holder.name or "someone", holder.count or 0, total)
+    end
+    return ("|cffff8800   %s holds it|r|cff999999  %d   (you: #%d of %d)|r")
+        :format(holder.name or "someone", holder.count or 0, rank, total)
 end
 
 local function getRow(f, i)
@@ -162,6 +228,7 @@ function UI:Refresh()
     local f = self.frame
     local y = -46
     local i = 0
+    local hidden = 0
 
     for _, t in ipairs(ns.db.trackers) do
         i = i + 1
@@ -195,13 +262,41 @@ function UI:Refresh()
             line = line .. "\n|cff999999   (all titles earned)|r"
         end
 
+        -- Published deeds carry a third line; unpublished ones must not pay
+        -- for a blank one, so the row advances by its real height.
+        local standings = standingsLine(t)
+        if standings then line = line .. "\n" .. standings end
+
+        local step = standings and 54 or 40
+        if -(y - step) > MAX_CONTENT then
+            -- Out of room. Stop here and account for the rest rather than
+            -- drawing rows through the bottom of the frame.
+            i = i - 1
+            hidden = #ns.db.trackers - i
+            break
+        end
+
+        row:SetHeight(step - 6)
         row.text:SetText(line)
         row:Show()
-        y = y - 40
+        y = y - step
     end
 
     for j = i + 1, #f.rows do
         f.rows[j]:Hide()
+    end
+
+    -- Grow to fit what is actually shown, instead of a fixed height that is
+    -- either wasteful with two deeds or too short with six.
+    f:SetHeight(math.max(MIN_HEIGHT, math.min(-y + 70, MAX_HEIGHT)))
+
+    if f.more then
+        if hidden > 0 then
+            f.more:SetText(("|cff999999+%d more \226\128\148 /deed list|r"):format(hidden))
+            f.more:Show()
+        else
+            f.more:Hide()
+        end
     end
 
     if f.empty then
