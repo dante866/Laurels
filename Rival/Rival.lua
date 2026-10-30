@@ -110,13 +110,19 @@ end
 -- when a chat line disappears unread. The toast is optional at runtime, so
 -- the headless suites (which load no UI) still exercise this path.
 function Rival:AnnounceSteal(kind, title, who, count)
+    -- The rival's name and the deed's title both originate from another
+    -- player, so they are escaped before being dropped into our own format
+    -- strings -- whose colour codes are ours and must survive as-is.
+    local safeTitle = ns.Comm.Escape(title)
+    local safeWho = ns.Comm.Escape(who)
     if kind == "took" then
-        ns:Print(("You took |cffffd100%s|r from %s!"):format(title, who or "someone"))
+        ns:Print(("You took |cffffd100%s|r from %s!")
+            :format(safeTitle, safeWho or "someone"))
     else
         ns:Print(("%s took |cffffd100%s|r from you! (they have %d)")
-            :format(who or "Someone", title, count or 0))
+            :format(safeWho or "Someone", safeTitle, count or 0))
     end
-    if ns.Toast then ns.Toast:Steal(kind, title, who, count) end
+    if ns.Toast then ns.Toast:Steal(kind, safeTitle, safeWho, count) end
 end
 
 -- Recompute the holder for a deed and announce if the title changed hands.

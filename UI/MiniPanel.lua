@@ -187,12 +187,14 @@ local function standingsLine(t)
     end
     -- GetRank returns nil when we have no claim on this deed yet. Say how
     -- many rivals there are rather than inventing a rank for ourselves.
+    -- The holder's name came from another client; escape before display.
+    local who = ns.Comm.Escape(holder.name) or "someone"
     if not rank then
         return ("|cffff8800   %s holds it|r|cff999999  %d   (%d on the ladder)|r")
-            :format(holder.name or "someone", holder.count or 0, total)
+            :format(who, holder.count or 0, total)
     end
     return ("|cffff8800   %s holds it|r|cff999999  %d   (you: #%d of %d)|r")
-        :format(holder.name or "someone", holder.count or 0, rank, total)
+        :format(who, holder.count or 0, rank, total)
 end
 
 local function getRow(f, i)

@@ -111,6 +111,19 @@ Comm.MAX_QUEUE = 64      -- drop oldest beyond this rather than grow forever
 local function esc(s) return (tostring(s or ""):gsub("|", "\127")) end
 local function unesc(s) return (tostring(s or ""):gsub("\127", "|")) end
 
+-- Make a string safe to display. Chat frames and tooltips treat "|" as an
+-- escape introducer, so an unescaped one swallows what follows ("PARTY|RAID"
+-- rendered as "PARTYAID") and, in text supplied by another player, could
+-- forge a colour code or a fake hyperlink. Doubling makes it literal.
+--
+-- Applied at display time rather than on decode: the ladder should keep the
+-- true string, and our own format strings carry real colour codes that must
+-- survive untouched.
+function Comm.Escape(s)
+    if type(s) ~= "string" then return s end
+    return (string.gsub(s, "|", "||"))
+end
+
 -- An absent optional field arrives as "" after a round trip; keep it nil so
 -- callers can test presence rather than comparing against an empty string.
 local function orNil(s)

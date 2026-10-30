@@ -136,8 +136,10 @@ function Nearby:Refresh()
         if d then
             row.deed = d
             local tiers = d.tiers and #d.tiers or 0
+            -- Deed name and author arrive over the wire as free text.
             row.text:SetText(("%s\n|cff999999   by %s \226\128\148 %d tier%s|r"):format(
-                d.name or "?", d.origin or "someone",
+                ns.Comm.Escape(d.name) or "?",
+                ns.Comm.Escape(d.origin) or "someone",
                 tiers, tiers == 1 and "" or "s"))
             local uuid = d.uuid
             row.accept:SetScript("OnClick", function()

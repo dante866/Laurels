@@ -278,8 +278,11 @@ SlashCmdList.DEEDKEEPER = function(msg)
         if want == "" then
             ns:Print(("broadcasting on: |cffffd100%s|r"):format(
                 ns.Comm:BroadcastChannel()))
+            -- Separated with "/" rather than "|": the chat frame treats "|"
+            -- as an escape introducer, so "PARTY|RAID" was being rendered as
+            -- "PARTYAID" with the |R eaten as a colour reset.
             ns:Print("  change with /deed channel <" ..
-                table.concat(ns.Comm.CHANNELS, "|") .. ">")
+                table.concat(ns.Comm.CHANNELS, " / ") .. ">")
             ns:Print("  /deed commtest shows which ones this client accepts.")
         else
             if not ns.Comm:IsValidChannel(want) then
@@ -318,8 +321,8 @@ SlashCmdList.DEEDKEEPER = function(msg)
                     -- so resolve it against this deed's tiers.
                     local title = ns.Rival:TitleFor(t, e.tier)
                     ns:Print(("  %d. %s \226\128\148 %d  %s%s%s"):format(
-                        i, e.name, e.count,
-                        title and ("|cffffd100<" .. title .. ">|r")
+                        i, ns.Comm.Escape(e.name), e.count,
+                        title and ("|cffffd100<" .. ns.Comm.Escape(title) .. ">|r")
                                or "|cff999999(no title yet)|r",
                         (i == 1) and "  (holder)" or "",
                         (e.guid == myGuid) and "  |cff00ff00(you)|r" or ""))

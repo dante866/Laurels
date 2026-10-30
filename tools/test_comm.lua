@@ -98,5 +98,12 @@ ns.db.commChannel = "NOPE"
 check("an invalid saved choice falls through", Comm:BroadcastChannel() == "YELL")
 ns.db, ns.tocChannel = nil, nil
 
+-- Display escaping. A deed title is free text from an EditBox with no filter,
+-- and travels to everyone who accepts the challenge, so a "|" in one would
+-- otherwise be eaten by the chat frame as an escape introducer.
+check("a pipe is doubled for display", Comm.Escape("Boar|rSlayer") == "Boar||rSlayer")
+check("ordinary text is untouched", Comm.Escape("Boar Slayer") == "Boar Slayer")
+check("non-strings pass through", Comm.Escape(nil) == nil)
+
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)
