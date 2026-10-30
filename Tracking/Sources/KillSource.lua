@@ -47,6 +47,10 @@ local function getNpcID(guid)
     return nil
 end
 
+-- Exposed so the GUID parsing can be tested headlessly: it is pure string
+-- work, and it is the half of this module most likely to differ per client.
+KillSource.ParseNpcID = getNpcID
+
 function KillSource:Init(engine)
     self.engine = engine
     if self.frame then return end
@@ -75,6 +79,17 @@ function KillSource:OnCombatLog(event, ...)
         _, subevent, _, sourceGUID, _, _, _, destGUID, destName =
             CombatLogGetCurrentEventInfo()
     else
+        -- Neither path yields a payload. Say so, once: a combat log we cannot
+        -- read means NOTHING is ever counted, and it was precisely that
+        -- silence which hid this bug -- /deed test injects synthetic signals
+        -- and bypasses the combat log, so everything looked fine.
+        if not self._warnedNoCombatLog then
+            self._warnedNoCombatLog = true
+            if ns.Print then
+                ns:Print("|cffff8800Can't read the combat log on this client.|r "
+                    .. "Kills will not count. Please report this.")
+            end
+        end
         return
     end
 
