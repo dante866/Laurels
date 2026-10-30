@@ -115,7 +115,8 @@ Syntax-check every file (LuaJIT = Lua 5.1, matches WoW):
 `powershell -ExecutionPolicy Bypass -File tools\check.ps1`
 
 Run all headless test suites (from the addon root):
-`luajit tools\test_engine.lua` · `test_ladder.lua` · `test_comm.lua` · `test_rival.lua`
+`luajit tools\test_engine.lua` · `test_ladder.lua` · `test_comm.lua` ·
+`test_rival.lua` · `test_killsource.lua`
 
 ## Install
 
