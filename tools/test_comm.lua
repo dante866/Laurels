@@ -1,5 +1,11 @@
 -- Headless test for Rival/Comm.lua. Run from addon root:  luajit tools/test_comm.lua
 local ns = {}
+local printed = {}
+function ns:Print(...)
+    local parts = {}
+    for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
+    printed[#printed + 1] = table.concat(parts, " ")
+end
 local chunk = assert(loadfile("Rival/Comm.lua"))
 chunk("Deedkeeper", ns)
 local Comm = ns.Comm
@@ -104,6 +110,26 @@ ns.db, ns.tocChannel = nil, nil
 check("a pipe is doubled for display", Comm.Escape("Boar|rSlayer") == "Boar||rSlayer")
 check("ordinary text is untouched", Comm.Escape("Boar Slayer") == "Boar Slayer")
 check("non-strings pass through", Comm.Escape(nil) == nil)
+
+-- Refusal detection. "Don't know" must not read as "fine": treating a nil
+-- result as success is exactly how the negotiation went blind under
+-- ChatThrottleLib, whose send reports nothing synchronously.
+check("0 is success", Comm:IsRefusal(0) == false)
+check("4 is a refusal", Comm:IsRefusal(4) == true)
+check("nil is not success", Comm:IsRefusal(nil) == false)
+check("a numeric string still counts", Comm:IsRefusal("4") == true)
+
+-- Falling back steps through the priority order, never revisits a channel
+-- the client already refused, and stops when they are exhausted.
+ns.db = {}
+Comm._refused = nil
+check("CHANNEL falls back to YELL", Comm:FallBackFrom("CHANNEL") == "YELL")
+check("the choice is remembered", ns.db.commChannel == "YELL")
+check("YELL falls back to GUILD", Comm:FallBackFrom("YELL") == "GUILD")
+check("GUILD falls back to SAY", Comm:FallBackFrom("GUILD") == "SAY")
+check("then there is nowhere left", Comm:FallBackFrom("SAY") == nil)
+check("and it says so", #printed > 0)
+ns.db, Comm._refused = nil, nil
 
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

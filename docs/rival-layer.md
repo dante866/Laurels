@@ -95,8 +95,9 @@ string (`2|TYPE|...`) beats pulling in AceSerializer. **But** a server-wide
 channel means every client hears every claim, and the addon-message pipe has a
 hard bandwidth cap — flooding it disconnects you. Throttling is therefore
 mandatory, not optional. `Comm:InitTransport` queues sends and drains them at
-`SEND_INTERVAL`; if ChatThrottleLib is dropped in alongside the addon it is
-used in preference. Broadcast on tier change only — no chatty heartbeat.
+`SEND_INTERVAL`, handing off to ChatThrottleLib wherever that global exists
+(see §9.4 — it usually does, and the handoff has a subtlety). Broadcast on
+tier change only — no chatty heartbeat.
 
 ## 4. Sync strategy
 
@@ -166,10 +167,22 @@ with LuaJIT before anything touches the game.
 2. **Scope** — one shared server-wide channel. Not a choice in the end: `SAY`
    and `YELL` are refused by the client (§3), so there is no nearby option. ✅
 3. **Trust** — social trust + rate cap (§5). ✅
-4. **Throttling** — built in rather than vendored. ChatThrottleLib could not be
-   fetched offline, and inventing a copy from memory would be worse than a
-   small queue we control. `Comm` queues and drains at a fixed interval, and
-   defers to ChatThrottleLib if it is ever present. ✅
+4. **Throttling** — **not vendored, and deliberately so.** ✅ `Comm` queues and
+   drains at a fixed interval, and hands off to **ChatThrottleLib** whenever
+   that global exists. It usually does: CTL is embedded by many addons, and on
+   Forever TRP3 ships v32 at `totalRP3/Libs/ChatThrottleLib/`, so Deedkeeper is
+   already throttling through it there. Shipping a second copy would buy
+   nothing — CTL version-checks and the newest wins regardless.
+
+   The catch, and why this needed care: `ChatThrottleLib:SendAddonMessage`
+   **returns nothing**, because it sends later. Channel negotiation (§3) reads
+   the client's result code, so under CTL it saw `nil` on every send and never
+   fell back — blind on exactly the clients most likely to have CTL loaded.
+   The result now comes from CTL's `callbackFn(callbackArg, didSend,
+   sendResult)` instead, through the same handler the direct path uses.
+
+   Also note CTL **errors** on a body over 255 bytes rather than failing soft,
+   which makes `Comm:Send`'s `MAX_BODY` check load-bearing, not just tidy.
 
 5. **Per-character or per-account** — **per-character.** ✅ Your alts appear
    as separate rivals and can take a title off you. That is deliberate, not a

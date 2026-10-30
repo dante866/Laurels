@@ -76,6 +76,15 @@ function Comm:BroadcastChannel()
     return self.DEFAULT_CHANNEL
 end
 
+-- Did the client refuse this chat type? 0 is success, non-zero a refusal.
+-- nil means we could not tell, which is not the same as success -- treating
+-- "don't know" as "fine" is how the negotiation went blind under
+-- ChatThrottleLib, whose send reports nothing at all synchronously.
+function Comm:IsRefusal(result)
+    local n = tonumber(result)
+    return n ~= nil and n ~= 0
+end
+
 -- A client refused `channel`. Step to the next candidate it hasn't already
 -- rejected, remember it, and say what changed about the ladder's reach.
 function Comm:FallBackFrom(channel)
@@ -326,22 +335,55 @@ function Comm:InitTransport()
     self.myGuid = UnitGUID and UnitGUID("player")
 
     local queue = {}
-    -- Returns the client's result code: 0 is success, non-zero a refusal
-    -- (a rejected chat type reports 4). nil means we couldn't tell.
-    local function rawSend(prefix, body, channel, target)
-        if ChatThrottleLib then
-            ChatThrottleLib:SendAddonMessage("NORMAL", prefix, body, channel, target)
-            return nil
+    local draining = false
+    local drain -- assigned below; referenced from the result handler
+
+    -- One place decides what a send result means, so the throttled and the
+    -- direct paths cannot drift apart. Called synchronously when we send
+    -- ourselves, and asynchronously from ChatThrottleLib's callback.
+    local function handleResult(item, channel, result)
+        if not Comm:IsRefusal(result) or item.retried then return end
+
+        -- The client refused this chat type. Move to one it allows and resend
+        -- there rather than dropping the message. Marked so it can't bounce
+        -- around the priority list indefinitely.
+        local nextChannel = Comm:FallBackFrom(channel)
+        if not nextChannel then return end
+
+        item.channel, item.target, item.retried = nextChannel, nil, true
+        table.insert(queue, 1, item)
+        -- The queue may have drained while we waited on a callback, so the
+        -- pump needs restarting rather than assuming it is still running.
+        if not draining then
+            draining = true
+            ns.After(0, drain)
         end
-        local send = Comm:SendFn()
-        if not send then return nil end
-        local ok, res = pcall(send, prefix, body, channel, target)
-        if not ok then return nil end
-        return tonumber(res)
     end
 
-    local draining = false
-    local function drain()
+    local function rawSend(item, channel, target)
+        if ChatThrottleLib then
+            -- CTL sends later and returns nothing, so the result arrives via
+            -- its callback (callbackArg, didSend, sendResult). Without this
+            -- the channel negotiation is blind on every client where some
+            -- other addon has loaded CTL -- on Forever, anyone running TRP3.
+            --
+            -- Note CTL *errors* on a body over 255 bytes rather than failing
+            -- soft, which makes Comm:Send's MAX_BODY check load-bearing.
+            ChatThrottleLib:SendAddonMessage("NORMAL", item.prefix, item.body,
+                channel, target, nil,
+                function(_, _didSend, sendResult)
+                    handleResult(item, channel, sendResult)
+                end)
+            return
+        end
+
+        local send = Comm:SendFn()
+        if not send then return end
+        local ok, res = pcall(send, item.prefix, item.body, channel, target)
+        if ok then handleResult(item, channel, res) end
+    end
+
+    drain = function()
         local item = table.remove(queue, 1)
         if not item then draining = false; return end
         -- Resolve the channel index at send time, not enqueue time.
@@ -355,17 +397,7 @@ function Comm:InitTransport()
                 return
             end
         end
-        local res = rawSend(item.prefix, item.body, channel, target)
-        if res and res ~= 0 and not item.retried then
-            -- The client refused this chat type. Move to one it allows and
-            -- resend this message there rather than dropping it. Marked so a
-            -- message can't bounce around the priority list indefinitely.
-            local nextChannel = Comm:FallBackFrom(channel)
-            if nextChannel then
-                item.channel, item.target, item.retried = nextChannel, nil, true
-                table.insert(queue, 1, item)
-            end
-        end
+        rawSend(item, channel, target)
         ns.After(Comm.SEND_INTERVAL, drain)
     end
 
