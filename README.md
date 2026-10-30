@@ -12,18 +12,30 @@ tracks your progress and awards the title. A later version lets other addon user
 
 ## Supported clients
 
-Both are **modern-engine** clients (`C_ChatInfo`, `C_Timer`, `C_Map` all
-present), so one codebase serves both. A client loads the `.toc` matching its
-flavour and falls back to the plain one, so these coexist:
-
 | Client | `.toc` | `## Interface` | Verified? |
 |---|---|---|---|
 | WoW-Forever 1.60.1 (build 70532) | `Deedkeeper.toc` | `16001` | ✅ measured in game |
 | Mists of Pandaria Classic | `Deedkeeper_Mists.toc` | `50504` | ✅ measured in game |
 
+Both are **Classic-flavoured clients on the modern engine** — WoW-Forever
+reports product `wow_classic_beta` — and one codebase serves both. A client
+loads the `.toc` matching its flavour and falls back to the plain one, so the
+two coexist.
+
+⚠️ **"Modern engine" does not mean "retail API".** Some modern namespaces are
+present — `C_ChatInfo`, `C_Timer` and `C_Map` are all measured as available,
+and the pre-Legion globals `SendAddonMessage` / `RegisterAddonMessagePrefix`
+are measured as *absent* — but plenty of retail-only functions are missing.
+`CombatLogGetCurrentEventInfo` is one of them, and assuming it cost us a
+silently dead kill tracker on Forever.
+
+**Before using any WoW API, check the Forever dump** rather than assuming:
+`docs/api.json` in [Atraeau/WoW-Addons](https://github.com/Atraeau/WoW-Addons).
+See [CLAUDE.md](CLAUDE.md) and `docs/forever-api-audit.md`.
+
 Active development happens on **MoP Classic**; WoW-Forever is in beta until
-early November. Note this is MoP *Classic*, on the modern client engine — not
-original 5.4, which has no `C_ChatInfo` and would need real porting.
+early November. This is MoP *Classic*, not original 5.4 — original 5.4 has no
+`C_ChatInfo` at all and would need a real port.
 
 ⚠️ After a client patch, re-check with `/run print(GetBuildInfo())`. It prints
 *version, build, date, tocversion*, and the **last** value is what `## Interface`
