@@ -171,12 +171,35 @@ with LuaJIT before anything touches the game.
    small queue we control. `Comm` queues and drains at a fixed interval, and
    defers to ChatThrottleLib if it is ever present. ✅
 
+5. **Per-character or per-account** — **per-character.** ✅ Your alts appear
+   as separate rivals and can take a title off you. That is deliberate, not a
+   limitation of GUID keying: whether an alt competes is the player's call,
+   made by choosing whether to track the deed on that character at all. An
+   account-level grouping would take that choice away, and GUIDs expose no
+   account handle to build it from anyway.
+
 Still open:
 
-- **Per-character or per-account?** GUIDs are per-character and expose no
-  account handle (`Player-4618-00D1568C` = realm 4618 + character). Per-account
-  would need manual alt-grouping. Currently per-character.
-- **Zone filtering** — restore a "nearby" display filter (§3)? Cosmetic.
+- **Zone filtering** — restore a "nearby" display filter (§3)? Cosmetic, and
+  moot on MoP Classic where `YELL` is genuinely range-limited.
+
+## 11. Testing without a second player
+
+`/deed simrival <deedId> <count> <name>` fabricates a rival's claim and pushes
+it through `Comm:HandleRaw` — the real receive path, not a shortcut into the
+ladder. Decode, version gate, echo guard, `OnClaim`, ladder write, holder
+recompute and the steal announcement all run exactly as they would for a
+genuine remote claim.
+
+The simulated clock advances in proportion to the jump, so a rival can be
+moved by more than `Ladder.MAX_RATE` in one call. Without that the anti-spoof
+cap would refuse any gain over 50/second and the tool could never set up a
+steal worth watching. The cap is not weakened: a hand-built claim that jumps
+instantly is still refused, and a test asserts it.
+
+What this does **not** cover is the wire itself — whether one real client's
+bytes reach another. `/deed commtest` covers that half: on MoP Classic a
+`YELL` message was measured going out and coming back through the server.
 
 ## 10. Player identity — **measured on both clients**
 

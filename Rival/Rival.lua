@@ -238,6 +238,58 @@ function Rival:Adopt(uuid)
     return t
 end
 
+-- Simulation (development) --------------------------------------------------
+
+-- Inject a claim as though another player had broadcast it.
+--
+-- Deliberately routed through Comm:HandleRaw rather than written straight to
+-- the ladder: it goes encode -> decode -> version gate -> echo guard ->
+-- OnClaim -> ladder -> holder recompute -> announcement, which is the whole
+-- path a real rival exercises. Writing to the ladder directly would prove
+-- almost nothing. This is what lets the rival layer be developed and watched
+-- without a second person logged in.
+--
+-- Returns the resulting ladder entry (nil if the claim was refused) and the
+-- fake GUID used.
+function Rival:SimulateClaim(tracker, name, count)
+    local key = self:KeyFor(tracker)
+    local tier = ns.Engine:CurrentTierIndex(tracker, count)
+
+    -- Stable per name, so simulating the same rival again updates that rival
+    -- instead of inventing a new one each time.
+    local guid = "Player-0-SIM" .. string.gsub(string.lower(name), "%s", "")
+
+    local function entryFor()
+        for _, e in ipairs(ns.Ladder:GetStandings(key)) do
+            if e.guid == guid then return e end
+        end
+    end
+    local existing = entryFor()
+
+    -- Two things constrain the timestamp. A remote claim needs one strictly
+    -- later than the last, and the anti-spoof rate cap refuses gains above
+    -- MAX_RATE per second. So advance the simulated clock far enough that the
+    -- jump reads as time spent farming rather than a teleport -- otherwise
+    -- this tool could never move a rival by more than MAX_RATE per call,
+    -- which would make it useless for setting up a steal.
+    --
+    -- The cap itself is untouched: real remote claims still face it.
+    local step = 1
+    if existing and count > existing.count then
+        step = math.max(1,
+            math.ceil((count - existing.count) / (ns.Ladder.MAX_RATE or 50)))
+    end
+    self._simTs = math.max(self._simTs or 0, self:Now(),
+        existing and existing.ts or 0) + step
+
+    ns.Comm:HandleRaw(ns.Comm:Encode({
+        type = "CLAIM", deedKey = key, count = count, tier = tier,
+        name = name, guid = guid, ts = self._simTs,
+    }), name, "SIMULATED")
+
+    return entryFor(), guid
+end
+
 -- Handlers -----------------------------------------------------------------
 
 function Rival:OnDefPub(msg)

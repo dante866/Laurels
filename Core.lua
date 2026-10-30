@@ -177,6 +177,35 @@ SlashCmdList.DEEDKEEPER = function(msg)
             ns.Rival:ForceBroadcast(t)
         end
 
+    elseif cmd == "simrival" then
+        -- Fake a rival so the steal mechanic can be exercised solo.
+        local id, count, name = rest:match("^(%S+)%s+(%d+)%s+(.+)$")
+        if not id then
+            ns:Print("usage: /deed simrival <deedId> <count> <rivalName>")
+            ns:Print("  fakes a rival's claim through the real receive path")
+            ns:Print("  e.g. |cff66ccff/deed simrival boarsmustdie 25 Thrall|r")
+        else
+            local t = ns.Engine:GetTracker(id)
+            if not t then
+                ns:Print("no deed with id:", id)
+            else
+                count = tonumber(count)
+                local entry = ns.Rival:SimulateClaim(t, name, count)
+                if not entry then
+                    ns:Print(("%s's claim was not recorded at all."):format(name))
+                elseif entry.count ~= count then
+                    -- Worth saying out loud: this is the anti-spoof rate cap
+                    -- doing its job, not the simulation failing.
+                    ns:Print(("%s is on %d, not %d \226\128\148 the rate cap rejected "
+                        .. "that jump as implausible for a known rival.")
+                        :format(name, entry.count, count))
+                else
+                    ns:Print(("simulated |cffffd100%s|r at %d \226\128\148 see "
+                        .. "|cff66ccff/deed rivals %s|r"):format(name, count, t.id))
+                end
+            end
+        end
+
     elseif cmd == "nearby" then
         if ns.Nearby then ns.Nearby:Toggle() end
 
@@ -349,6 +378,8 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed rivals <id>     show the leaderboard for a deed")
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")
         ns:Print("  /deed commtest        test whether addon messages work (diagnostic)")
+        ns:Print("  /deed simrival <id> <count> <name>")
+        ns:Print("                        fake a rival, to test stealing solo")
         ns:Print("  /deed channel [type]  show or set the broadcast channel")
         ns:Print("  /deed test <n> <name> simulate n kills of <name> (for testing)")
         ns:Print(" ")

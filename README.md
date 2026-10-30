@@ -103,11 +103,22 @@ accepts.
 On WoW-Forever you'll see the client's **Code of Conduct notice** on login.
 That's the game reacting to joining a channel, not an addon error.
 
+**Testing a steal on your own.** `/deed simrival <deedId> <count> <name>`
+fakes a rival's claim through the real receive path — decode, echo guard,
+ladder, holder recompute, announcement — so you can watch a title change hands
+without a second player:
+
+```
+/deed simrival boarsmustdie 25 Thrall    they take it off you
+/deed test 30 Mottled Boar               you take it back
+```
+
 Known limitations (by design, see `docs/rival-layer.md` §5):
 - The rate cap only catches *acceleration* of a known rival; a brand-new contact's
   first absolute count can't be sanity-checked (no baseline). Social-trust covers this.
-- Titles are per-character: GUIDs expose no account handle, so your own alts
-  compete with each other.
+- Titles are **per-character**, so your own alts can take a title off you.
+  That's deliberate — whether an alt competes is your call, made by choosing
+  whether to track the deed on that character.
 
 ### Developing
 

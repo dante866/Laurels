@@ -214,5 +214,45 @@ end
 local body = Author.ns.Comm:EncodeDef({ def = long, guid = "g", ver = "1" })
 check("an oversized definition is trimmed to fit", #body <= Author.ns.Comm.MAX_BODY)
 
+-- 11. Simulated rivals drive the whole receive path, so the steal mechanic
+-- can be developed and watched without a second player logged in.
+local Lone = makeClient("Lone")
+farm(Lone, "Kobold", 1000)
+check("we hold it to begin with", Lone.ns.Ladder:GetHolder(KEY).name == "Lone")
+
+local tracker1 = Lone.ns.db.trackers[1]
+local sim = Lone.ns.Rival:SimulateClaim(tracker1, "Thrall", 1500)
+check("the simulated rival lands on the ladder", sim ~= nil and sim.count == 1500)
+check("they take the title", Lone.ns.Ladder:GetHolder(KEY).name == "Thrall")
+check("and we are told we lost it", has(Lone, "took") and has(Lone, "from you"))
+check("their tier was resolved, not guessed", sim.tier == 1)
+
+-- Simulating the same rival again updates them rather than cloning them.
+local before = #Lone.ns.Ladder:GetStandings(KEY)
+Lone.ns.Rival:SimulateClaim(tracker1, "Thrall", 1600)
+check("simulating the same name again updates them",
+    #Lone.ns.Ladder:GetStandings(KEY) == before)
+check("their count moved", Lone.ns.Ladder:GetHolder(KEY).count == 1600)
+
+-- A big jump is allowed, because the simulated clock advances enough to make
+-- it plausible. Without that the rate cap would refuse any gain over
+-- MAX_RATE and the tool could never set up a steal worth watching.
+local big = Lone.ns.Rival:SimulateClaim(tracker1, "Thrall", 50000)
+check("a large jump is allowed by advancing the clock", big and big.count == 50000)
+
+-- The cap itself is untouched: a hand-built claim that jumps instantly is
+-- still refused, so simulation has not quietly disarmed the anti-spoofing.
+local far = Lone.ns.Ladder:GetStandings(KEY)[1]
+Lone.ns.Comm:HandleRaw(Lone.ns.Comm:Encode({
+    type = "CLAIM", deedKey = KEY, count = 99999999, tier = 2, name = "Thrall",
+    guid = "Player-0-SIMthrall", ts = far.ts + 1 }), "Thrall", "SIMULATED")
+check("an instant jump is still refused",
+    Lone.ns.Ladder:GetHolder(KEY).count == 50000)
+
+-- And we can take it back by out-farming them.
+farm(Lone, "Kobold", 50000)
+check("we hold it again", Lone.ns.Ladder:GetHolder(KEY).name == "Lone")
+check("and were told we took it", has(Lone, "You took"))
+
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)
