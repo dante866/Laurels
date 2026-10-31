@@ -39,14 +39,7 @@ function Toast:GetFrame()
     f:SetSize(440, 88)
     f:SetPoint("CENTER", 0, 180)
     f:SetFrameStrata("HIGH")
-    if f.SetBackdrop then
-        f:SetBackdrop({
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 16, edgeSize = 16,
-            insets = { left = 4, right = 4, top = 4, bottom = 4 },
-        })
-    end
+    ns.ApplyDialogBackdrop(f)
     -- Never interactive: this appears mid-combat and must not eat a click.
     f:EnableMouse(false)
     f:SetAlpha(0)

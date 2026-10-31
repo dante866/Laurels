@@ -149,38 +149,23 @@ local function parseNpcIDs(str)
 end
 
 function AuthorForm:GetFrame()
-    if self.frame then return self.frame end
+    return ns.MainFrame:PaneFrame("author")
+end
 
-    local f = CreateFrame("Frame", "DeedkeeperAuthorForm", UIParent,
-        BackdropTemplateMixin and "BackdropTemplate" or nil)
-    f:SetSize(390, 472)
-    f:SetPoint("CENTER", 130, 0)
-    if f.SetBackdrop then
-        f:SetBackdrop({
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 16, edgeSize = 16,
-            insets = { left = 4, right = 4, top = 4, bottom = 4 },
-        })
-    end
-    f:SetFrameStrata("DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    f:Hide()
-    table.insert(UISpecialFrames, "DeedkeeperAuthorForm") -- ESC closes
+local function buildAuthorPane(f)
+    AuthorForm.frame = f
 
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -14)
+    -- The pane's own header: the window title belongs to the shell now, but
+    -- creating and editing still need telling apart.
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", 0, -6)
     title:SetText("New Deed")
     f.titleText = title
 
     -- Only shown while editing: the id can't change (progress and the rival
     -- ladder are both keyed on it), so it's stated rather than offered.
     local idText = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    idText:SetPoint("TOP", 0, -32)
+    idText:SetPoint("TOP", 0, -24)
     idText:Hide()
     f.idText = idText
 
@@ -325,21 +310,31 @@ function AuthorForm:GetFrame()
 
     local save = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     save:SetSize(110, 24)
-    save:SetPoint("BOTTOMRIGHT", -20, 16)
+    save:SetPoint("BOTTOMRIGHT", -4, 4)
     save:SetText("Save")
     save:SetScript("OnClick", function() AuthorForm:Save() end)
 
     local cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     cancel:SetSize(110, 24)
-    cancel:SetPoint("BOTTOMLEFT", 20, 16)
+    cancel:SetPoint("BOTTOMLEFT", 4, 4)
     cancel:SetText("Cancel")
     cancel:SetScript("OnClick", function()
-        AuthorForm.editing = nil
-        f:Hide()
+        -- Cancelling returns to the list rather than closing the window:
+        -- the form is a tab now, not a dialog over the top of everything.
+        AuthorForm:Reset()
+        ns.MainFrame:Select("deeds")
     end)
+end
 
-    self.frame = f
-    return f
+-- Back to a blank "New Deed", including the tab label, after a save or a
+-- cancel -- otherwise the tab would keep claiming to be editing.
+function AuthorForm:Reset()
+    self.editing = nil
+    ns.MainFrame:SetTabLabel("author", "New Deed")
+    if self.frame then
+        self.frame.titleText:SetText("New Deed")
+        self.frame.idText:Hide()
+    end
 end
 
 function AuthorForm:Clear()
@@ -408,13 +403,15 @@ function AuthorForm:Open(trackerId)
         f.titleText:SetText("Edit Deed")
         f.idText:SetText(("id: %s \226\128\148 progress is kept"):format(existing.id))
         f.idText:Show()
+        ns.MainFrame:SetTabLabel("author", "Edit Deed")
         self:Load(existing)
     else
         f.titleText:SetText("New Deed")
         f.idText:Hide()
+        ns.MainFrame:SetTabLabel("author", "New Deed")
     end
 
-    f:Show()
+    ns.MainFrame:Show("author")
     f.nameEdit:SetFocus()
 end
 
@@ -477,8 +474,8 @@ function AuthorForm:Save()
                     .. "contesting the version they already have.")
             end
         end
-        self.editing = nil
-        f:Hide()
+        self:Reset()
+        ns.MainFrame:Select("deeds")
         return
     end
 
@@ -495,5 +492,9 @@ function AuthorForm:Save()
     -- obvious next step after authoring a deed is publishing it.
     ns:Print(("  id |cffffd100%s|r \226\128\148 publish it with |cff66ccff/deed publish %s|r")
         :format(def.id, def.id))
-    f:Hide()
+    -- Straight back to the list, where the new deed now appears.
+    self:Reset()
+    ns.MainFrame:Select("deeds")
 end
+
+ns.MainFrame:RegisterPane("author", "New Deed", buildAuthorPane)

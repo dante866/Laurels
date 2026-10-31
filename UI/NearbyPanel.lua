@@ -51,35 +51,11 @@ local function showTooltip(row)
 end
 
 function Nearby:GetFrame()
-    if self.frame then return self.frame end
+    return ns.MainFrame:PaneFrame("nearby")
+end
 
-    local f = CreateFrame("Frame", "DeedkeeperNearbyPanel", UIParent,
-        BackdropTemplateMixin and "BackdropTemplate" or nil)
-    f:SetSize(380, 300)
-    f:SetPoint("CENTER", -130, 0)
-    if f.SetBackdrop then
-        f:SetBackdrop({
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 16, edgeSize = 16,
-            insets = { left = 4, right = 4, top = 4, bottom = 4 },
-        })
-    end
-    f:SetFrameStrata("DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    f:Hide()
-    table.insert(UISpecialFrames, "DeedkeeperNearbyPanel")
-
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -14)
-    title:SetText("Nearby Challenges")
-
-    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -4, -4)
+local function buildNearbyPane(f)
+    Nearby.frame = f
 
     local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
     empty:SetPoint("CENTER", 0, 10)
@@ -90,15 +66,15 @@ function Nearby:GetFrame()
     f.rows = {}
     for i = 1, ROWS do
         local row = CreateFrame("Frame", nil, f)
-        row:SetSize(336, 32)
-        row:SetPoint("TOPLEFT", 20, -46 - (i - 1) * 34)
+        row:SetSize(398, 32)
+        row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * 36)
         row:EnableMouse(true)
         row:SetScript("OnEnter", showTooltip)
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
         row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
         row.text:SetPoint("TOPLEFT", 0, 0)
-        row.text:SetWidth(252)
+        row.text:SetWidth(310)
         row.text:SetJustifyH("LEFT")
 
         row.accept = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
@@ -112,7 +88,7 @@ function Nearby:GetFrame()
 
     local refresh = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     refresh:SetSize(110, 24)
-    refresh:SetPoint("BOTTOMLEFT", 20, 16)
+    refresh:SetPoint("BOTTOMLEFT", 4, 4)
     refresh:SetText("Ask Again")
     refresh:SetScript("OnClick", function()
         -- A HELLO prompts every client in range to resend what it publishes,
@@ -121,9 +97,6 @@ function Nearby:GetFrame()
             name = ns.Rival:MyName(), guid = ns.Rival:MyGuid() })
         ns:Print("asked nearby players to resend their published deeds\226\128\166")
     end)
-
-    self.frame = f
-    return f
 end
 
 function Nearby:Refresh()
@@ -171,15 +144,14 @@ function Nearby:Refresh()
 end
 
 function Nearby:Toggle()
-    local f = self:GetFrame()
-    if f:IsShown() then
-        f:Hide()
-    else
-        f:Show()
-        self:Refresh()
-        -- Ask on open so the list is current rather than whatever we happened
-        -- to overhear earlier.
-        ns.Comm:Send({ type = "HELLO", ver = ns.version,
-            name = ns.Rival:MyName(), guid = ns.Rival:MyGuid() })
-    end
+    ns.MainFrame:Toggle("nearby")
+end
+
+ns.MainFrame:RegisterPane("nearby", "Nearby", buildNearbyPane)
+ns.MainFrame:GetPane("nearby").OnShow = function()
+    Nearby:Refresh()
+    -- Ask on open so the list is current rather than whatever we happened to
+    -- overhear earlier.
+    ns.Comm:Send({ type = "HELLO", ver = ns.version,
+        name = ns.Rival:MyName(), guid = ns.Rival:MyGuid() })
 end

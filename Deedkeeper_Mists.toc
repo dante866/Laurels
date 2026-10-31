@@ -34,6 +34,7 @@ Tracking\Sources\KillSource.lua
 Rival\Ladder.lua
 Rival\Comm.lua
 Rival\Rival.lua
+UI\MainFrame.lua
 UI\MiniPanel.lua
 UI\AuthorForm.lua
 UI\NearbyPanel.lua

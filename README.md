@@ -52,7 +52,7 @@ regardless while you correct the number.
 - [x] Pluggable **sources** feeding normalized "signals" into the engine
 - [x] **KillSource** — counts killing blows via the combat log (name / npcID match)
 - [x] Per-character progress + account-wide definitions (SavedVariables)
-- [x] Minimal draggable panel + slash commands
+- [x] Single tabbed window (**Deeds** / **Nearby** / **New Deed**) + slash commands
 
 **v2 — in-game authoring**
 - [x] "New Deed" form: name, match (name-contains / NPC IDs), up to 5 title tiers
@@ -149,8 +149,14 @@ Both `.toc` files ship together and the client picks the right one.
 
 ## Try it
 
+Everything lives in one window with three tabs — **Deeds**, **Nearby** and
+**New Deed** — rather than separate frames stacking on top of each other.
+The slash commands below just open it on the right tab.
+
 ```
-/deed                  toggle the panel
+/deed                  toggle the window (Deeds tab)
+/deed nearby           open it on the Nearby tab
+/deed new              open it on the New Deed tab
 /deed list             list trackers + progress in chat
 /deed test 1000 Kobold simulate 1000 Kobold kills (earns "Kobold Slayer")
 /deed test 9000 Kobold ...9000 more earns "Kobold Destroyer"
@@ -167,7 +173,7 @@ deliberately **no catalogue of premade deeds** — a library of ready-made deeds
 would make the common case "pick one of ours" when it should be "invent one
 and dare people to beat it."
 
-Open `/deed new` (or the **New Deed** button) and fill in two things:
+Open the **New Deed** tab (or `/deed new`) and fill in two things:
 
 | Field | Example |
 |---|---|
@@ -182,8 +188,8 @@ worked example in-game. To let others contest the title, `/deed publish <id>`.
 **Competing with someone.** Publish a deed and nearby players can accept it:
 
 1. You: `/deed publish boarsmustdie`
-2. Them: **Nearby** button in `/deed` (or `/deed nearby`) → your deed is listed
-   by name, with its tiers in the tooltip → **Accept**
+2. Them: the **Nearby** tab in `/deed` (or `/deed nearby`) → your deed is
+   listed by name, with its tiers in the tooltip → **Accept**
 3. Both kill things, within `YELL` range of each other
 
 Accepting builds the deed from **your** definition — the same match rules and
@@ -239,7 +245,11 @@ Core.lua                 lifecycle, SavedVariables, slash commands, defaults
 Tracking/Engine.lua      owns trackers; matches signals -> increments -> tiers
 Tracking/Sources/
   KillSource.lua         combat log -> { kind="kill", name, npcID }
-UI/MiniPanel.lua         minimal list panel
+UI/MainFrame.lua         the window: tab row, panes, lazy pane building
+UI/MiniPanel.lua         Deeds pane -- the tracker list
+UI/NearbyPanel.lua       Nearby pane -- challenges heard, with Accept
+UI/AuthorForm.lua        New Deed / Edit Deed pane
+UI/Toast.lua             steal banners (its own overlay, not a pane)
 ```
 
 A **source** turns WoW events into normalized **signals**:

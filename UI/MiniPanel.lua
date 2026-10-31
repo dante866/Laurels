@@ -1,88 +1,48 @@
 local addonName, ns = ...
 
 -- ---------------------------------------------------------------------------
--- MiniPanel: minimal UI. A draggable frame listing every tracker with its
--- count, earned title, and next-tier goal, plus a delete button per row and
--- a "New Deed" button. Rebuilt on demand via Refresh().
+-- The Deeds pane: every tracker with its count, earned title, next-tier goal,
+-- and (for published deeds) who currently holds it.
+--
+-- A pane inside MainFrame rather than a window of its own -- the shell owns
+-- the backdrop, title, dragging and closing, and the tab row replaced the
+-- New Deed / Nearby buttons that used to sit along the bottom.
 -- ---------------------------------------------------------------------------
 
 local UI = {}
 ns.UI = UI
 
--- The panel resizes to its contents, because rows are no longer a fixed
--- height: a published deed carries a holder/rank line that an unpublished one
--- doesn't. Bounded so it neither collapses nor runs off the screen.
-local MIN_HEIGHT  = 220
-local MAX_HEIGHT  = 520
-local MAX_CONTENT = MAX_HEIGHT - 110 -- room for the title and the buttons
+-- Rows vary in height -- a published deed carries a holder/rank line that an
+-- unpublished one doesn't -- so the list is laid out against a fixed budget
+-- and anything that doesn't fit is reported as a count instead.
+local MAX_CONTENT = 390
 
 function UI:Init()
-    -- Frame created lazily on first Toggle().
+    -- Pane built lazily by MainFrame on first selection.
 end
 
+-- Kept so older call sites and the refresh paths keep working; the "frame"
+-- is now the content holder MainFrame hands us, not a window.
 function UI:GetFrame()
-    if self.frame then return self.frame end
+    return ns.MainFrame:PaneFrame("deeds")
+end
 
-    local f = CreateFrame("Frame", "DeedkeeperPanel", UIParent,
-        BackdropTemplateMixin and "BackdropTemplate" or nil)
-    f:SetSize(360, 320)
-    f:SetPoint("CENTER")
-    if f.SetBackdrop then
-        f:SetBackdrop({
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 16, edgeSize = 16,
-            insets = { left = 4, right = 4, top = 4, bottom = 4 },
-        })
-    end
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    f:SetFrameStrata("DIALOG")
-    f:Hide()
-    table.insert(UISpecialFrames, "DeedkeeperPanel") -- ESC closes
-
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -14)
-    title:SetText("Deedkeeper")
-
-    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -4, -4)
-
-    local newBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    newBtn:SetSize(110, 24)
-    newBtn:SetPoint("BOTTOMLEFT", 20, 14)
-    newBtn:SetText("New Deed")
-    newBtn:SetScript("OnClick", function()
-        if ns.AuthorForm then ns.AuthorForm:Open() end
-    end)
-
-    local nearbyBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    nearbyBtn:SetSize(110, 24)
-    nearbyBtn:SetPoint("BOTTOMRIGHT", -20, 14)
-    nearbyBtn:SetText("Nearby")
-    nearbyBtn:SetScript("OnClick", function()
-        if ns.Nearby then ns.Nearby:Toggle() end
-    end)
-    f.nearbyBtn = nearbyBtn
+local function buildDeedsPane(f)
+    UI.frame = f
 
     local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
     empty:SetPoint("CENTER", 0, 10)
-    empty:SetText("No deeds yet.\nClick \"New Deed\" below, or type |cff66ccff/deed new|r.\n\n"
+    empty:SetText("No deeds yet.\nUse the |cff66ccffNew Deed|r tab above.\n\n"
         .. "|cff999999A deed is a thing to count\nplus the titles you earn for it.|r")
     empty:Hide()
     f.empty = empty
 
     local more = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    more:SetPoint("BOTTOM", 0, 44)
+    more:SetPoint("BOTTOM", 0, 6)
     more:Hide()
     f.more = more
 
     f.rows = {}
-    self.frame = f
-    return f
 end
 
 -- One-line summary of what a deed counts, for the tooltip.
@@ -202,14 +162,14 @@ local function getRow(f, i)
     if row then return row end
 
     row = CreateFrame("Frame", nil, f)
-    row:SetSize(316, 34)
+    row:SetSize(398, 34)
     row:EnableMouse(true)
     row:SetScript("OnEnter", showRowTooltip)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
     row.text:SetPoint("TOPLEFT", 0, 0)
-    row.text:SetWidth(238)
+    row.text:SetWidth(318)
     row.text:SetJustifyH("LEFT")
 
     row.del = CreateFrame("Button", nil, row, "UIPanelCloseButton")
@@ -228,7 +188,7 @@ end
 function UI:Refresh()
     if not self.frame or not self.frame:IsShown() then return end
     local f = self.frame
-    local y = -46
+    local y = -4
     local i = 0
     local hidden = 0
 
@@ -236,7 +196,7 @@ function UI:Refresh()
         i = i + 1
         local row = getRow(f, i)
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", 20, y)
+        row:SetPoint("TOPLEFT", 4, y)
 
         local id = t.id
         row.trackerId = id
@@ -288,10 +248,6 @@ function UI:Refresh()
         f.rows[j]:Hide()
     end
 
-    -- Grow to fit what is actually shown, instead of a fixed height that is
-    -- either wasteful with two deeds or too short with six.
-    f:SetHeight(math.max(MIN_HEIGHT, math.min(-y + 70, MAX_HEIGHT)))
-
     if f.more then
         if hidden > 0 then
             f.more:SetText(("|cff999999+%d more \226\128\148 /deed list|r"):format(hidden))
@@ -307,23 +263,20 @@ function UI:Refresh()
     self:RefreshNearby()
 end
 
--- Called by the rival layer when a new published deed is heard, so an open
--- Nearby panel fills in live rather than needing a reopen.
+-- Called by the rival layer when a new published deed is heard. The pending
+-- count rides on the tab itself, so an unopened Nearby pane still advertises
+-- that something is waiting.
 function UI:RefreshNearby()
     if ns.Nearby then ns.Nearby:Refresh() end
-    if self.frame and self.frame:IsShown() and self.frame.nearbyBtn then
-        local pending = #ns.Rival:NearbyDeeds()
-        self.frame.nearbyBtn:SetText(pending > 0
-            and ("Nearby (%d)"):format(pending) or "Nearby")
-    end
+    if not ns.MainFrame:IsShown() then return end
+    local pending = ns.Rival and #ns.Rival:NearbyDeeds() or 0
+    ns.MainFrame:SetTabLabel("nearby",
+        pending > 0 and ("Nearby (%d)"):format(pending) or "Nearby")
 end
 
 function UI:Toggle()
-    local f = self:GetFrame()
-    if f:IsShown() then
-        f:Hide()
-    else
-        f:Show()
-        self:Refresh()
-    end
+    ns.MainFrame:Toggle("deeds")
 end
+
+ns.MainFrame:RegisterPane("deeds", "Deeds", buildDeedsPane)
+ns.MainFrame:GetPane("deeds").OnShow = function() UI:Refresh() end
