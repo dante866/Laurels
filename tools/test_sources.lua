@@ -88,6 +88,14 @@ IsFishingLoot = function() return fishing end
 GetNumLootItems = function() return #loot end
 GetLootSlotInfo = function(slot) return "icon", loot[slot], 1 end
 
+-- Melee: slot -> itemID, itemID -> weapon subclass (class 2 = weapon).
+local equipped = { [16] = 1001, [17] = 1002 }
+local SUBCLASS = { [1001] = 7, [1002] = 15, [1003] = 1, [1004] = 8 }
+GetInventoryItemID = function(_, slot) return equipped[slot] end
+C_Item = { GetItemInfoInstant = function(id)
+    return id, "Weapon", "?", "INVTYPE_WEAPON", "icon", 2, SUBCLASS[id]
+end }
+
 -- --- addon -----------------------------------------------------------------
 
 local function deed(id, event, match)
@@ -119,6 +127,13 @@ local ns = {
 
         deed("anyfish",   "fish",  {}),
         deed("smallfish", "fish",  { nameContains = "Smallfish" }),
+
+        deed("anyswing",  "swing", {}),
+        deed("swordhits", "swing", { weapon = "sword" }),
+        deed("daggerhits","swing", { weapon = "dagger" }),
+        deed("axehits",   "swing", { weapon = "axe" }),
+        deed("fisticuffs","swing", { weapon = "unarmed" }),
+        deed("boarsword", "swing", { weapon = "sword", nameContains = "Boar" }),
     } },
     charDB = { progress = {}, earned = {} },
 }
@@ -127,12 +142,13 @@ function ns:Print() end
 for _, f in ipairs({ "Tracking/Kinds.lua", "Tracking/Signals.lua",
         "Tracking/Engine.lua", "Tracking/Sources/QuestSource.lua",
         "Tracking/Sources/DeathSource.lua", "Tracking/Sources/EmoteSource.lua",
-        "Tracking/Sources/SpellSource.lua", "Tracking/Sources/FishSource.lua" }) do
+        "Tracking/Sources/SpellSource.lua", "Tracking/Sources/FishSource.lua",
+        "Tracking/Sources/SwingSource.lua" }) do
     assert(loadfile(f))("Deedkeeper", ns)
 end
 local Engine = ns.Engine
 Engine:Init()
-for _, k in ipairs({ "Quest", "Death", "Emote", "Spell", "Fish" }) do
+for _, k in ipairs({ "Quest", "Death", "Emote", "Spell", "Fish", "Swing" }) do
     Engine:RegisterSource(string.lower(k), ns[k .. "Source"])
 end
 
@@ -269,6 +285,53 @@ fire("LOOT_OPENED")
 check("fish: next catch counts", p("anyfish") == 2)
 check("fish: catch without the item doesn't", p("smallfish") == 1)
 
+-- --- melee swings ----------------------------------------------------------
+
+local BOAR = "Creature-0-3299-0-7-3098-000136DF22"
+local function swing(subevent, src, offHand, destName)
+    -- 11 base values, then SWING_DAMAGE's 10: isOffHand is the 21st.
+    fire("COMBAT_LOG_EVENT_UNFILTERED", clock, subevent, false, src, "Me", 0, 0,
+        BOAR, destName or "Mottled Boar", 0, 0,
+        12, 0, 1, 0, 0, 0, false, false, false, offHand)
+end
+
+swing("SWING_DAMAGE", PLAYER, false)
+check("swing: a main-hand sword hit counts", p("swordhits") == 1)
+check("swing: any-weapon deed counts it", p("anyswing") == 1)
+check("swing: target filter matches", p("boarsword") == 1)
+check("swing: a sword isn't a dagger", p("daggerhits") == 0)
+
+swing("SWING_DAMAGE", PLAYER, true)
+check("swing: an off-hand hit uses the off-hand weapon", p("daggerhits") == 1)
+check("swing: and not the main hand's", p("swordhits") == 1)
+
+swing("SWING_MISSED", PLAYER, false)
+check("swing: a miss deals no damage, so doesn't count", p("anyswing") == 2)
+
+swing("SWING_DAMAGE", RIVAL, false)
+check("swing: someone else's swing is ignored", p("anyswing") == 2)
+
+swing("SWING_DAMAGE", PLAYER, false, "Kobold Vermin")
+check("swing: target filter rejects other mobs", p("boarsword") == 1 and p("swordhits") == 2)
+
+-- Gear is cached until it changes.
+equipped[16] = 1003 -- a two-handed axe
+swing("SWING_DAMAGE", PLAYER, false)
+check("swing: cached weapon until gear changes", p("swordhits") == 3 and p("axehits") == 0)
+fire("PLAYER_EQUIPMENT_CHANGED")
+swing("SWING_DAMAGE", PLAYER, false)
+check("swing: two-handed axe counts as axe", p("axehits") == 1)
+
+equipped[16] = 1004 -- a two-handed sword
+fire("PLAYER_EQUIPMENT_CHANGED")
+swing("SWING_DAMAGE", PLAYER, false)
+check("swing: two-handed sword counts as sword", p("swordhits") == 4)
+
+equipped[16], equipped[17] = nil, nil
+fire("PLAYER_EQUIPMENT_CHANGED")
+swing("SWING_DAMAGE", PLAYER, false)
+check("swing: no weapon is unarmed", p("fisticuffs") == 1)
+
 -- --- descriptions ----------------------------------------------------------
 
 local D = ns.Kinds.Describe
@@ -278,6 +341,7 @@ check("describe: cause", D("death", { cause = "falling" }) == "deaths: falling")
 check("describe: emote with target", D("emote", { emote = "HUG", nameContains = "Rabbit" })
     == 'emotes: /hug, target name has "Rabbit"')
 check("describe: ids", D("spell", { ids = { 8690, 8691 } }) == "casts: 2 spell IDs")
+check("describe: weapon", D("swing", { weapon = "sword" }) == "melee hits: sword")
 check("describe: unknown kind says so", D("haircut", {}):find("can't count") ~= nil)
 
 print(("\n%d passed, %d failed"):format(passed, failed))

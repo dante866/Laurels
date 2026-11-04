@@ -25,6 +25,7 @@ Tracking\Kinds.lua
 Tracking\Signals.lua
 Tracking\Engine.lua
 Tracking\Sources\KillSource.lua
+Tracking\Sources\SwingSource.lua
 Tracking\Sources\QuestSource.lua
 Tracking\Sources\DeathSource.lua
 Tracking\Sources\EmoteSource.lua

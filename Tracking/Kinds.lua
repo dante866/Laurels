@@ -16,13 +16,50 @@ local addonName, ns = ...
 --                 original `npcIDs` key so existing deeds and older clients
 --                 are untouched; every other kind uses `ids`.
 --   zone/zoneID   where it happened
---   cause, emote  the one kind-specific `qualifier`, for deaths and emotes
+--   cause, weapon, emote
+--                 the one kind-specific `qualifier`, for deaths, melee swings
+--                 and emotes. Causes and weapons are picked from a fixed list
+--                 (a kind's `choices`); an emote is typed.
 -- ---------------------------------------------------------------------------
 
 local Kinds = {}
 ns.Kinds = Kinds
 
-Kinds.ORDER = { "kill", "quest", "death", "emote", "spell", "fish" }
+Kinds.ORDER = { "kill", "swing", "quest", "death", "emote", "spell", "fish" }
+
+-- Qualifier lists, in menu order. `any` labels the unfiltered choice.
+--
+-- Death cause `other` is what a death with no recent damage on record
+-- reports; it is never offered as a filter.
+Kinds.CAUSES = {
+    any = "Any cause",
+    order = { "creature", "player", "falling", "drowning", "fire", "lava",
+              "slime", "fatigue" },
+    labels = {
+        creature = "Killed by a creature",
+        player   = "Killed by a player",
+        falling  = "Falling",
+        drowning = "Drowning",
+        fire     = "Fire",
+        lava     = "Lava",
+        slime    = "Slime",
+        fatigue  = "Fatigue",
+    },
+}
+
+-- Weapon families: one- and two-handed versions count as the same family,
+-- so a Sword deed takes either. `other` (a fishing pole, say) is never
+-- offered as a filter.
+Kinds.WEAPONS = {
+    any = "Any weapon",
+    order = { "sword", "axe", "mace", "dagger", "fist", "staff", "polearm",
+              "unarmed" },
+    labels = {
+        sword = "Sword", axe = "Axe", mace = "Mace", dagger = "Dagger",
+        fist = "Fist weapon", staff = "Staff", polearm = "Polearm",
+        unarmed = "Unarmed",
+    },
+}
 
 Kinds.defs = {
     kill = {
@@ -33,6 +70,12 @@ Kinds.defs = {
         -- An unfiltered kill deed would count every kill in the game.
         needsFilter = true,
     },
+    swing = {
+        label = "Melee swing", plural = "melee hits",
+        nameLabel = "Target name has", idsLabel = "Target NPC IDs",
+        idNoun = "target NPC ID", qualifier = "weapon", choices = Kinds.WEAPONS,
+        zoneHint = "optional \226\128\147 only counts hits in that zone",
+    },
     quest = {
         label = "Quest", plural = "quests turned in",
         nameLabel = "Quest title has", idsLabel = "Quest IDs", idNoun = "quest ID",
@@ -41,7 +84,7 @@ Kinds.defs = {
     death = {
         label = "Death", plural = "deaths",
         nameLabel = "Killer name has", idsLabel = "Killer NPC IDs",
-        idNoun = "killer NPC ID", qualifier = "cause",
+        idNoun = "killer NPC ID", qualifier = "cause", choices = Kinds.CAUSES,
         zoneHint = "optional \226\128\147 only counts deaths in that zone",
     },
     emote = {
@@ -66,21 +109,6 @@ Kinds.defs = {
     },
 }
 
--- Death causes, in menu order. `other` is what a death with no recent
--- damage on record reports; it is never offered as a filter.
-Kinds.CAUSE_ORDER = { "creature", "player", "falling", "drowning", "fire",
-                      "lava", "slime", "fatigue" }
-Kinds.CAUSES = {
-    creature = "Killed by a creature",
-    player   = "Killed by a player",
-    falling  = "Falling",
-    drowning = "Drowning",
-    fire     = "Fire",
-    lava     = "Lava",
-    slime    = "Slime",
-    fatigue  = "Fatigue",
-}
-
 function Kinds.Get(kind)
     return Kinds.defs[kind or "kill"]
 end
@@ -101,11 +129,11 @@ function Kinds.Describe(kind, m)
     end
     m = m or {}
     local parts = {}
-    if m.cause then
-        parts[#parts + 1] = string.lower(Kinds.CAUSES[m.cause] or m.cause)
-    end
-    if m.emote then
-        parts[#parts + 1] = "/" .. string.lower(m.emote)
+    local q = def.qualifier and m[def.qualifier]
+    if q and def.choices then
+        parts[#parts + 1] = string.lower(def.choices.labels[q] or q)
+    elseif q then
+        parts[#parts + 1] = "/" .. string.lower(q) -- the emote
     end
     if m.nameContains then
         parts[#parts + 1] = ('%s "%s"'):format(string.lower(def.nameLabel), m.nameContains)

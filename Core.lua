@@ -103,6 +103,7 @@ end
 local function initModules()
     ns.Engine:Init()
     ns.Engine:RegisterSource("kill", ns.KillSource)
+    ns.Engine:RegisterSource("swing", ns.SwingSource)
     ns.Engine:RegisterSource("quest", ns.QuestSource)
     ns.Engine:RegisterSource("death", ns.DeathSource)
     ns.Engine:RegisterSource("emote", ns.EmoteSource)
@@ -321,6 +322,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
                 local l = s.last
                 local detail = {}
                 if l.cause then detail[#detail + 1] = "cause=" .. l.cause end
+                if l.weapon then detail[#detail + 1] = "weapon=" .. l.weapon end
                 if l.emote then detail[#detail + 1] = "emote=" .. l.emote end
                 detail[#detail + 1] = "name=" .. tostring(l.names
                     and table.concat(l.names, "/") or l.name)

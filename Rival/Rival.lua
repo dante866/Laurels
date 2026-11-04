@@ -79,6 +79,7 @@ function Rival:KeyFor(tracker)
         parts[#parts + 1] = "i=" .. table.concat(ids, ",")
     end
     if m.cause then parts[#parts + 1] = "c=" .. m.cause end
+    if m.weapon then parts[#parts + 1] = "w=" .. m.weapon end
     if m.emote then parts[#parts + 1] = "e=" .. string.upper(m.emote) end
     return table.concat(parts, "~")
 end

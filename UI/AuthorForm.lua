@@ -34,7 +34,6 @@ end
 -- --- zones -----------------------------------------------------------------
 
 local ANY_ZONE = "Any zone  |cff999999(not scoped)|r"
-local ANY_CAUSE = "Any cause"
 
 local function currentZone()
     local name = GetZoneText and GetZoneText()
@@ -214,32 +213,40 @@ local function buildAuthorPane(f)
     end)
     UIDropDownMenu_SetWidth(evDrop, 90)
 
-    -- Deaths: which cause. Sits beside the Event dropdown.
-    local causeDrop = CreateFrame("Frame", "DeedkeeperCauseDropDown", f,
+    -- A kind's pick-one qualifier (a death's cause, a swing's weapon), from
+    -- the list in its `choices`. Sits beside the Event dropdown.
+    local choiceDrop = CreateFrame("Frame", "DeedkeeperChoiceDropDown", f,
         "UIDropDownMenuTemplate")
-    causeDrop:SetPoint("TOPLEFT", 230, -70)
-    f.causeDrop = causeDrop
-    local function chooseCause(cause)
-        f.causeChoice = cause
-        UIDropDownMenu_SetText(causeDrop, cause and ns.Kinds.CAUSES[cause] or ANY_CAUSE)
+    choiceDrop:SetPoint("TOPLEFT", 230, -70)
+    f.choiceDrop = choiceDrop
+    local function currentChoices()
+        local def = ns.Kinds.Get(f.kind)
+        return def and def.choices
+    end
+    local function choose(value)
+        f.choice = value
+        local c = currentChoices()
+        if c then UIDropDownMenu_SetText(choiceDrop, value and c.labels[value] or c.any) end
         CloseDropDownMenus()
     end
-    f.chooseCause = chooseCause
-    UIDropDownMenu_Initialize(causeDrop, function()
+    f.choose = choose
+    UIDropDownMenu_Initialize(choiceDrop, function()
+        local c = currentChoices()
+        if not c then return end
         local info = UIDropDownMenu_CreateInfo()
-        info.text = ANY_CAUSE
-        info.checked = (f.causeChoice == nil)
-        info.func = function() chooseCause(nil) end
+        info.text = c.any
+        info.checked = (f.choice == nil)
+        info.func = function() choose(nil) end
         UIDropDownMenu_AddButton(info)
-        for _, cause in ipairs(ns.Kinds.CAUSE_ORDER) do
+        for _, value in ipairs(c.order) do
             info = UIDropDownMenu_CreateInfo()
-            info.text = ns.Kinds.CAUSES[cause]
-            info.checked = (f.causeChoice == cause)
-            info.func = function() chooseCause(cause) end
+            info.text = c.labels[value]
+            info.checked = (f.choice == value)
+            info.func = function() choose(value) end
             UIDropDownMenu_AddButton(info)
         end
     end)
-    UIDropDownMenu_SetWidth(causeDrop, 120)
+    UIDropDownMenu_SetWidth(choiceDrop, 120)
 
     -- Emotes: which one, typed as its slash command.
     f.emoteSlash = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -443,10 +450,14 @@ function AuthorForm:SetKind(kind)
     local f = self.frame
     local def = ns.Kinds.Get(kind)
     if not (f and def) then return end
+    local changed = f.kind ~= kind
     f.kind = kind
     UIDropDownMenu_SetText(f.eventDrop, def.label)
 
-    f.causeDrop:SetShown(def.qualifier == "cause")
+    -- Unlike typed text, a picked cause means nothing as a weapon, so the
+    -- pick resets when the kind changes.
+    f.choiceDrop:SetShown(def.choices ~= nil)
+    if changed then f.choose(nil) end
     local emote = def.qualifier == "emote"
     f.emoteSlash:SetShown(emote)
     f.emoteEdit:SetShown(emote)
@@ -469,7 +480,7 @@ function AuthorForm:Clear()
     f.matchEdit:SetText("")
     f.npcEdit:SetText("")
     f.emoteEdit:SetText("")
-    f.chooseCause(nil)
+    f.choose(nil)
     self:SetKind("kill")
     f.zoneChoice = nil
     if f.zoneDrop then UIDropDownMenu_SetText(f.zoneDrop, ANY_ZONE) end
@@ -489,7 +500,8 @@ function AuthorForm:Load(t)
     f.matchEdit:SetText(m.nameContains or "")
     local ids = ns.Kinds.IDs(m)
     f.npcEdit:SetText(ids and table.concat(ids, ", ") or "")
-    f.chooseCause(m.cause)
+    local def = ns.Kinds.Get(t.event or "kill")
+    f.choose(def and def.choices and m[def.qualifier] or nil)
     f.emoteEdit:SetText(m.emote and string.lower(m.emote) or "")
 
     if m.zone or m.zoneID then
@@ -557,8 +569,8 @@ function AuthorForm:Save()
         local ids = parseNpcIDs(f.npcEdit:GetText())
         if ids then match[def.idsKey or "ids"] = ids end
     end
-    if def.qualifier == "cause" and f.causeChoice then
-        match.cause = f.causeChoice
+    if def.choices and f.choice then
+        match[def.qualifier] = f.choice
     elseif def.qualifier == "emote" then
         local token = ns.EmoteSource.ResolveToken(f.emoteEdit:GetText())
         if token then match.emote = token end

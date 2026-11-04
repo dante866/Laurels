@@ -196,6 +196,7 @@ a name filter and a zone; the labels change to say what the name refers to.
 | Type | Counts | Filters | Example |
 |---|---|---|---|
 | **Kill** | your killing blows | mob name, NPC IDs | 500 kills, name has "Murloc" |
+| **Melee swing** | your auto-attacks that deal damage | weapon (sword, axe, mace, dagger, fist, staff, polearm, unarmed), target name, target NPC IDs | 1000 hits with a sword |
 | **Quest** | quests turned in | quest title, quest IDs | 100 quests in Westfall |
 | **Death** | your deaths | cause, killer name, killer NPC IDs | 25 deaths, cause Falling |
 | **Emote** | emotes you perform | which emote, target name, target NPC IDs | 50 `/hug`s, target has "Rabbit" |
@@ -207,6 +208,9 @@ every kill or every internal cast. The others are fine unfiltered ("die 100
 times").
 
 Things to know:
+- **Melee swings** count hits, not misses, dodges or parries. Special attacks
+  (Heroic Strike) are spell casts, not swings. Dual-wielding, each hit counts
+  for the weapon in the hand that swung; one- and two-handed count the same.
 - **Quest zone** is where you *hand the quest in*, not where its objectives were.
 - **Death cause** comes from the last damage you took within 10 seconds of
   dying. A death with nothing recent on record counts only for "any cause".
@@ -283,6 +287,7 @@ Tracking/Signals.lua     shared signal helpers: zone, NPC id from GUID, combat l
 Tracking/Engine.lua      owns trackers; matches signals -> increments -> tiers
 Tracking/Sources/
   KillSource.lua         combat log -> { kind="kill", name, npcID }
+  SwingSource.lua        combat log SWING_DAMAGE -> { kind="swing", weapon, name, id }
   QuestSource.lua        QUEST_TURNED_IN -> { kind="quest", id, name }
   DeathSource.lua        PLAYER_DEAD + last hit -> { kind="death", cause, name, id }
   EmoteSource.lua        DoEmote/PerformEmote hooks -> { kind="emote", emote, name, id }
@@ -301,7 +306,7 @@ A **source** turns WoW events into normalized **signals**:
 zoneID = 37, amount = 1 }`.
 The **engine** matches each signal against every tracker whose `event` equals the
 signal `kind`, applies the tracker's `match` criteria (`nameContains`,
-`npcIDs`/`ids`, `zone`/`zoneID`, and `cause`/`emote` for deaths and emotes),
+`npcIDs`/`ids`, `zone`/`zoneID`, and `cause`/`weapon`/`emote` qualifiers),
 increments per-character progress, and resolves title tiers. A new deed type is
 a new source plus an entry in `Tracking/Kinds.lua` — the engine doesn't change.
 

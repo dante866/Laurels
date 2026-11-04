@@ -163,6 +163,10 @@ local e = roundTrip({ uuid = "U", name = "Hugs", event = "emote",
 check("emote kind and token survive", e.event == "emote" and e.match.emote == "HUG")
 check("emote target filter survives", e.match.nameContains == "Rabbit")
 
+local s = roundTrip({ uuid = "U", name = "Sword Master", event = "swing",
+    match = { weapon = "sword" }, tiers = tiers })
+check("swing weapon survives", s.event == "swing" and s.match.weapon == "sword")
+
 local q = roundTrip({ uuid = "U", name = "Mines", event = "quest",
     match = { ids = { 62, 76 } }, tiers = tiers })
 check("quest ids decode to ids, not npcIDs",
