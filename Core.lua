@@ -51,6 +51,20 @@ function ns:Print(...)
     end
 end
 
+-- The game's "blocked from an action" popup doesn't name the action, but
+-- these two events do. Registered first thing so a block during loading is
+-- caught too.
+if CreateFrame then
+    local watch = CreateFrame("Frame")
+    watch:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+    watch:RegisterEvent("ADDON_ACTION_BLOCKED")
+    watch:SetScript("OnEvent", function(_, event, who, fn)
+        if who ~= addonName then return end
+        ns:Print(("|cffff6060%s|r: the game stopped Laurels calling %s"):format(
+            event == "ADDON_ACTION_FORBIDDEN" and "Forbidden" or "Blocked", tostring(fn)))
+    end)
+end
+
 -- ---------------------------------------------------------------------------
 -- Default definitions (account-wide, created on first ever load)
 -- ---------------------------------------------------------------------------

@@ -17,7 +17,11 @@ local addonName, ns = ...
 local MB = {}
 ns.MinimapButton = MB
 
-MB.RADIUS = 80                -- minimap centre to button centre
+-- Minimap edge to button centre. The distance from the centre is read from
+-- the minimap's size each time, because Forever's minimap is bigger than
+-- Classic's: a fixed 80 (right for Classic's 140px minimap) left the button
+-- well inside Forever's ring.
+MB.EDGE_OFFSET = 10
 MB.DEFAULT_ANGLE = math.rad(225) -- lower left, clear of the zoom buttons
 
 local ICON = "Interface\\AddOns\\" .. addonName .. "\\Media\\LaurelsIcon"
@@ -28,9 +32,10 @@ local function settings()
 end
 
 function MB:UpdatePosition(angle)
+    local radius = (Minimap:GetWidth() or 140) / 2 + self.EDGE_OFFSET
     self.button:ClearAllPoints()
     self.button:SetPoint("CENTER", Minimap, "CENTER",
-        math.cos(angle) * self.RADIUS, math.sin(angle) * self.RADIUS)
+        math.cos(angle) * radius, math.sin(angle) * radius)
 end
 
 local function pendingCount()
