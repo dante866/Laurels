@@ -34,6 +34,7 @@ end
 -- --- zones -----------------------------------------------------------------
 
 local ANY_ZONE = "Any zone  |cff999999(not scoped)|r"
+local ANY_CAUSE = "Any cause"
 
 local function currentZone()
     local name = GetZoneText and GetZoneText()
@@ -192,21 +193,75 @@ local function buildAuthorPane(f)
     f.nameEdit = makeEdit(f, 230)
     f.nameEdit:SetPoint("TOPLEFT", 120, -42)
 
+    -- The kind of deed. Picking one relabels the filters below (and hides
+    -- the ones a kind has no use for) without clearing what's typed.
     makeLabel(f, "Event", 20, -76)
-    local ev = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    ev:SetPoint("TOPLEFT", 124, -76)
-    ev:SetText("kill  |cff999999(more event types coming)|r")
+    local evDrop = CreateFrame("Frame", "DeedkeeperEventDropDown", f,
+        "UIDropDownMenuTemplate")
+    evDrop:SetPoint("TOPLEFT", 104, -70)
+    f.eventDrop = evDrop
+    UIDropDownMenu_Initialize(evDrop, function()
+        for _, kind in ipairs(ns.Kinds.ORDER) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = ns.Kinds.Get(kind).label
+            info.checked = (f.kind == kind)
+            info.func = function()
+                AuthorForm:SetKind(kind)
+                CloseDropDownMenus()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    UIDropDownMenu_SetWidth(evDrop, 90)
 
-    makeLabel(f, "Mob name has", 20, -106)
+    -- Deaths: which cause. Sits beside the Event dropdown.
+    local causeDrop = CreateFrame("Frame", "DeedkeeperCauseDropDown", f,
+        "UIDropDownMenuTemplate")
+    causeDrop:SetPoint("TOPLEFT", 230, -70)
+    f.causeDrop = causeDrop
+    local function chooseCause(cause)
+        f.causeChoice = cause
+        UIDropDownMenu_SetText(causeDrop, cause and ns.Kinds.CAUSES[cause] or ANY_CAUSE)
+        CloseDropDownMenus()
+    end
+    f.chooseCause = chooseCause
+    UIDropDownMenu_Initialize(causeDrop, function()
+        local info = UIDropDownMenu_CreateInfo()
+        info.text = ANY_CAUSE
+        info.checked = (f.causeChoice == nil)
+        info.func = function() chooseCause(nil) end
+        UIDropDownMenu_AddButton(info)
+        for _, cause in ipairs(ns.Kinds.CAUSE_ORDER) do
+            info = UIDropDownMenu_CreateInfo()
+            info.text = ns.Kinds.CAUSES[cause]
+            info.checked = (f.causeChoice == cause)
+            info.func = function() chooseCause(cause) end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    UIDropDownMenu_SetWidth(causeDrop, 120)
+
+    -- Emotes: which one, typed as its slash command.
+    f.emoteSlash = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    f.emoteSlash:SetPoint("TOPLEFT", 244, -76)
+    f.emoteSlash:SetText("/")
+    f.emoteEdit = makeEdit(f, 90)
+    f.emoteEdit:SetPoint("TOPLEFT", 256, -72)
+    f.emoteHint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.emoteHint:SetPoint("TOPLEFT", 352, -77)
+    f.emoteHint:SetText("e.g. hug")
+
+    f.matchLabel = makeLabel(f, "Mob name has", 20, -106)
     f.matchEdit = makeEdit(f, 230)
     f.matchEdit:SetPoint("TOPLEFT", 120, -102)
 
-    makeLabel(f, "NPC IDs", 20, -136)
+    f.idsLabel = makeLabel(f, "NPC IDs", 20, -136)
     f.npcEdit = makeEdit(f, 230)
     f.npcEdit:SetPoint("TOPLEFT", 120, -132)
     local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetPoint("TOPLEFT", 122, -152)
     hint:SetText("optional, comma-separated \226\128\147 narrows the match")
+    f.idsHint = hint
 
     makeLabel(f, "Zone", 20, -178)
     local dd = CreateFrame("Frame", "DeedkeeperZoneDropDown", f,
@@ -312,7 +367,8 @@ local function buildAuthorPane(f)
 
     local zhint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     zhint:SetPoint("TOPLEFT", 122, -198)
-    zhint:SetText("optional \226\128\147 only counts kills in that zone")
+    zhint:SetText(ns.Kinds.Get("kill").zoneHint)
+    f.zoneHint = zhint
 
     makeLabel(f, "Tiers  (count, then title)", 20, -224)
     f.tierRows = {}
@@ -326,17 +382,24 @@ local function buildAuthorPane(f)
     end
 
     -- Tab / Shift-Tab walk the fields in reading order, wrapping at the ends.
-    -- The zone dropdown isn't an edit box, so focus steps over it.
-    local order = { f.nameEdit, f.matchEdit, f.npcEdit }
+    -- Dropdowns aren't edit boxes, so focus steps over them, and over any box
+    -- the current kind has hidden.
+    local order = { f.nameEdit, f.emoteEdit, f.matchEdit, f.npcEdit }
     for _, r in ipairs(f.tierRows) do
         table.insert(order, r.count)
         table.insert(order, r.title)
     end
+    local function step(from, dir)
+        local i = from
+        for _ = 1, #order do
+            i = (i - 1 + dir) % #order + 1
+            if order[i]:IsShown() then return order[i] end
+        end
+    end
     for i, e in ipairs(order) do
-        local nextBox = order[i % #order + 1]
-        local prevBox = order[(i - 2) % #order + 1]
         e:SetScript("OnTabPressed", function()
-            if IsShiftKeyDown() then prevBox:SetFocus() else nextBox:SetFocus() end
+            local target = step(i, IsShiftKeyDown() and -1 or 1)
+            if target then target:SetFocus() end
         end)
     end
 
@@ -356,6 +419,8 @@ local function buildAuthorPane(f)
         AuthorForm:Reset()
         ns.MainFrame:Select("deeds")
     end)
+
+    AuthorForm:SetKind("kill")
 end
 
 -- Back to a blank "New Deed", including the menu label, after a save or a
@@ -366,7 +431,35 @@ function AuthorForm:Reset()
     if self.frame then
         self.frame.titleText:SetText("New Deed")
         self.frame.idText:Hide()
+        -- Blank too: the sidebar returns to this pane without Open(), and
+        -- would otherwise show the last deed's values as a "New Deed".
+        self:Clear()
     end
+end
+
+-- Show the controls a kind uses, relabelled for it. Typed values stay put,
+-- so switching kinds back and forth loses nothing.
+function AuthorForm:SetKind(kind)
+    local f = self.frame
+    local def = ns.Kinds.Get(kind)
+    if not (f and def) then return end
+    f.kind = kind
+    UIDropDownMenu_SetText(f.eventDrop, def.label)
+
+    f.causeDrop:SetShown(def.qualifier == "cause")
+    local emote = def.qualifier == "emote"
+    f.emoteSlash:SetShown(emote)
+    f.emoteEdit:SetShown(emote)
+    f.emoteHint:SetShown(emote)
+
+    f.matchLabel:SetText(def.nameLabel)
+    local ids = def.idsLabel ~= nil
+    f.idsLabel:SetShown(ids)
+    f.npcEdit:SetShown(ids)
+    f.idsHint:SetShown(ids)
+    if ids then f.idsLabel:SetText(def.idsLabel) end
+
+    f.zoneHint:SetText(def.zoneHint)
 end
 
 function AuthorForm:Clear()
@@ -375,6 +468,9 @@ function AuthorForm:Clear()
     f.nameEdit:SetText("")
     f.matchEdit:SetText("")
     f.npcEdit:SetText("")
+    f.emoteEdit:SetText("")
+    f.chooseCause(nil)
+    self:SetKind("kill")
     f.zoneChoice = nil
     if f.zoneDrop then UIDropDownMenu_SetText(f.zoneDrop, ANY_ZONE) end
     for _, r in ipairs(f.tierRows) do
@@ -389,8 +485,12 @@ function AuthorForm:Load(t)
     f.nameEdit:SetText(t.name or "")
 
     local m = t.match or {}
+    self:SetKind(t.event or "kill")
     f.matchEdit:SetText(m.nameContains or "")
-    f.npcEdit:SetText(m.npcIDs and table.concat(m.npcIDs, ", ") or "")
+    local ids = ns.Kinds.IDs(m)
+    f.npcEdit:SetText(ids and table.concat(ids, ", ") or "")
+    f.chooseCause(m.cause)
+    f.emoteEdit:SetText(m.emote and string.lower(m.emote) or "")
 
     if m.zone or m.zoneID then
         f.zoneChoice = { zone = m.zone, zoneID = m.zoneID }
@@ -445,11 +545,24 @@ function AuthorForm:Save()
         return
     end
 
+    local kind = f.kind or "kill"
+    local def = ns.Kinds.Get(kind)
+
+    -- Only the fields this kind shows are read: a value typed under another
+    -- kind and then hidden by switching mustn't quietly narrow the deed.
     local match = {}
     local nameContains = trim(f.matchEdit:GetText())
     if nameContains ~= "" then match.nameContains = nameContains end
-    local npcIDs = parseNpcIDs(f.npcEdit:GetText())
-    if npcIDs then match.npcIDs = npcIDs end
+    if def.idsLabel then
+        local ids = parseNpcIDs(f.npcEdit:GetText())
+        if ids then match[def.idsKey or "ids"] = ids end
+    end
+    if def.qualifier == "cause" and f.causeChoice then
+        match.cause = f.causeChoice
+    elseif def.qualifier == "emote" then
+        local token = ns.EmoteSource.ResolveToken(f.emoteEdit:GetText())
+        if token then match.emote = token end
+    end
 
     -- A zone on its own is a legitimate deed ("500 kills in Westfall"), so it
     -- counts toward the deed matching something.
@@ -459,9 +572,11 @@ function AuthorForm:Save()
         if zc.zoneID then match.zoneID = zc.zoneID end
     end
 
-    if not next(match) then
-        ns:Print("Give the deed something to match: a 'Mob name has' value, "
-            .. "NPC IDs, or a zone.")
+    -- Most kinds are fine unfiltered ("die 100 times"); kills and casts
+    -- would count everything.
+    if def.needsFilter and not next(match) then
+        ns:Print(("Give the deed something to match: a '%s' value, %s, or a zone.")
+            :format(def.nameLabel, def.idsLabel or "ids"))
         return
     end
 
@@ -480,7 +595,7 @@ function AuthorForm:Save()
 
     if self.editing then
         local t = ns.Engine:UpdateTracker(self.editing,
-            { name = name, match = match, tiers = tiers })
+            { name = name, event = kind, match = match, tiers = tiers })
         if not t then
             ns:Print("that deed no longer exists \226\128\148 nothing saved.")
         else
@@ -498,19 +613,19 @@ function AuthorForm:Save()
         return
     end
 
-    local def = ns.Engine:CreateTracker({
+    local created = ns.Engine:CreateTracker({
         name = name,
-        event = "kill",
+        event = kind,
         match = match,
         tiers = tiers,
     })
     ns:Print(("Created deed: |cffffd100%s|r (%d tier%s)%s."):format(
-        def.name, #tiers, #tiers == 1 and "" or "s",
+        created.name, #tiers, #tiers == 1 and "" or "s",
         match.zone and (" in " .. match.zone) or ""))
     -- Surface the id here: it is what every other command takes, and the
     -- obvious next step after authoring a deed is publishing it.
     ns:Print(("  id |cffffd100%s|r \226\128\148 publish it with |cff66ccff/deed publish %s|r")
-        :format(def.id, def.id))
+        :format(created.id, created.id))
     -- Straight back to the list, where the new deed now appears.
     self:Reset()
     ns.MainFrame:Select("deeds")

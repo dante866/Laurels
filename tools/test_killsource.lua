@@ -35,6 +35,7 @@ strsplit = function(delim, str)
     return unpack(parts)
 end
 
+assert(loadfile("Tracking/Signals.lua"))("Deedkeeper", ns)
 assert(loadfile("Tracking/Sources/KillSource.lua"))("Deedkeeper", ns)
 local KS = ns.KillSource
 

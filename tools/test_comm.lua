@@ -6,6 +6,7 @@ function ns:Print(...)
     for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
     printed[#printed + 1] = table.concat(parts, " ")
 end
+assert(loadfile("Tracking/Kinds.lua"))("Deedkeeper", ns)
 local chunk = assert(loadfile("Rival/Comm.lua"))
 chunk("Deedkeeper", ns)
 local Comm = ns.Comm
@@ -130,6 +131,50 @@ check("GUILD falls back to SAY", Comm:FallBackFrom("GUILD") == "SAY")
 check("then there is nowhere left", Comm:FallBackFrom("SAY") == nil)
 check("and it says so", #printed > 0)
 ns.db, Comm._refused = nil, nil
+
+-- --- deed kinds beyond kills over DEFPUB ------------------------------------
+
+local function roundTrip(def)
+    return Comm:Decode(Comm:Encode({ type = "DEFPUB", guid = "Player-1-AB",
+        ver = "t", def = def })).def
+end
+local tiers = { { count = 5, title = "T" } }
+
+-- A kill deed must encode exactly as it did before other kinds existed, or
+-- older clients would stop understanding the only kind they know.
+local killBody = Comm:Encode({ type = "DEFPUB", guid = "G", ver = "t", def = {
+    uuid = "U", name = "Boars", event = "kill",
+    match = { nameContains = "Boar", npcIDs = { 3098 } }, tiers = tiers } })
+check("kill DEFPUB layout unchanged",
+    killBody == Comm.PROTO .. "|DEFPUB|U|G|t|Boars|kill|Boar|3098|||5|T")
+local k = roundTrip({ uuid = "U", name = "Boars", event = "kill",
+    match = { npcIDs = { 3098 } }, tiers = tiers })
+check("kill ids decode to npcIDs", k.match.npcIDs and k.match.npcIDs[1] == 3098
+    and k.match.ids == nil)
+
+local d = roundTrip({ uuid = "U", name = "Splat", event = "death",
+    match = { cause = "falling", zone = "Thousand Needles" }, tiers = tiers })
+check("death kind survives", d.event == "death")
+check("death cause survives", d.match.cause == "falling")
+check("death zone survives", d.match.zone == "Thousand Needles")
+
+local e = roundTrip({ uuid = "U", name = "Hugs", event = "emote",
+    match = { emote = "HUG", nameContains = "Rabbit" }, tiers = tiers })
+check("emote kind and token survive", e.event == "emote" and e.match.emote == "HUG")
+check("emote target filter survives", e.match.nameContains == "Rabbit")
+
+local q = roundTrip({ uuid = "U", name = "Mines", event = "quest",
+    match = { ids = { 62, 76 } }, tiers = tiers })
+check("quest ids decode to ids, not npcIDs",
+    q.match.ids and q.match.ids[2] == 76 and q.match.npcIDs == nil)
+
+local plain = roundTrip({ uuid = "U", name = "Dead", event = "death",
+    match = {}, tiers = tiers })
+check("an any-cause death has no cause", plain.event == "death" and plain.match.cause == nil)
+
+local unknown = Comm:Decode(Comm.PROTO .. "|DEFPUB|U|G|t|X|haircut:bald||||||5|T")
+check("an unknown kind decodes without its qualifier",
+    unknown.def.event == "haircut" and next(unknown.def.match) == nil)
 
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

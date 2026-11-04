@@ -13,56 +13,15 @@ local addonName, ns = ...
 local KillSource = {}
 ns.KillSource = KillSource
 
--- Where the player is standing right now. Both forms are returned because they
--- fail in opposite directions: the name is human-readable and what a deed
--- stores, but is localized; the uiMapID is language-proof but needs a mapping
--- table. Trackers match on either (see Engine's zone criterion).
-local function getZone()
-    local name = GetZoneText and GetZoneText()
-    if name == "" then name = nil end
-    local id
-    if C_Map and C_Map.GetBestMapForUnit then
-        id = C_Map.GetBestMapForUnit("player")
-    end
-    return name, id
-end
-
-local function getNpcID(guid)
-    if type(guid) ~= "string" then return nil end
-    -- Two GUID formats span the clients Deedkeeper targets:
-    --   * WoD+ dash form:  "Creature-0-serverID-instanceID-zoneUID-NPCID-spawnUID"
-    --   * pre-WoD hex form: "0x<typebits><entry><spawn>" (e.g. Mists 5.x)
-    -- Only npcID-matched deeds need this; name-matched deeds use destName and
-    -- are unaffected either way.
-    if guid:find("-", 1, true) then
-        return tonumber((select(6, strsplit("-", guid))))
-    end
-    -- Legacy hex GUID: the creature entry sits in bytes 4-6 (hex chars 7-12).
-    -- VERIFY this offset against a real Forever GUID before trusting npcID
-    -- matches on the legacy client; the layout is client-specific.
-    local hex = guid:match("^0[xX](%x+)$")
-    if hex and #hex >= 12 then
-        return tonumber(hex:sub(7, 12), 16)
-    end
-    return nil
-end
-
--- Exposed so the GUID parsing can be tested headlessly: it is pure string
--- work, and it is the half of this module most likely to differ per client.
-KillSource.ParseNpcID = getNpcID
+-- Exposed so the GUID parsing can be tested headlessly. The parser lives in
+-- Signals now (deaths and emotes need it too); this alias keeps the tests'
+-- entry point.
+KillSource.ParseNpcID = ns.Signals.NpcID
 
 -- The signal killing this mob here would produce. Shared by the real kill and
 -- the unit tooltip, so both describe a mob identically.
 function KillSource.SignalFor(name, guid)
-    local zone, zoneID = getZone()
-    return {
-        kind   = "kill",
-        name   = name,
-        npcID  = getNpcID(guid),
-        zone   = zone,
-        zoneID = zoneID,
-        amount = 1,
-    }
+    return ns.Signals.Make("kill", { name = name, npcID = ns.Signals.NpcID(guid) })
 end
 
 function KillSource:Init(engine)

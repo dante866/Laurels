@@ -69,12 +69,17 @@ function Rival:KeyFor(tracker)
     local m = tracker.match or {}
     local parts = { tracker.event or "kill" }
     if m.nameContains then parts[#parts + 1] = "n=" .. string.lower(m.nameContains) end
-    if m.npcIDs then
+    -- Only parts a deed actually has are added, so a kill deed's key is the
+    -- same as it was before other kinds existed.
+    local list = m.ids or m.npcIDs
+    if list then
         local ids = {}
-        for _, id in ipairs(m.npcIDs) do ids[#ids + 1] = tonumber(id) end
+        for _, id in ipairs(list) do ids[#ids + 1] = tonumber(id) end
         table.sort(ids)
         parts[#parts + 1] = "i=" .. table.concat(ids, ",")
     end
+    if m.cause then parts[#parts + 1] = "c=" .. m.cause end
+    if m.emote then parts[#parts + 1] = "e=" .. string.upper(m.emote) end
     return table.concat(parts, "~")
 end
 

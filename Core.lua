@@ -94,7 +94,7 @@ local function showIntro()
         .. "|cffffffffKobold Slaying|r.")
     ns:Print("  A deed is |cffffffffsomething to count|r plus the "
         .. "|cfffffffftitles|r you earn for it.")
-    ns:Print("  e.g. count kills matching \"Murloc\" \226\134\146 "
+    ns:Print("  e.g. count kills matching \"Murloc\": "
         .. "|cffffd100Murloc Menace|r at 500, |cffffd100Murloc Bane|r at 5000.")
     ns:Print("  Make your own with |cff66ccff/deed new|r. "
         .. "See a worked example with |cff66ccff/deed help|r.")
@@ -103,6 +103,11 @@ end
 local function initModules()
     ns.Engine:Init()
     ns.Engine:RegisterSource("kill", ns.KillSource)
+    ns.Engine:RegisterSource("quest", ns.QuestSource)
+    ns.Engine:RegisterSource("death", ns.DeathSource)
+    ns.Engine:RegisterSource("emote", ns.EmoteSource)
+    ns.Engine:RegisterSource("spell", ns.SpellSource)
+    ns.Engine:RegisterSource("fish", ns.FishSource)
     if ns.UI and ns.UI.Init then ns.UI:Init() end
     if ns.Rival and ns.Rival.Init then ns.Rival:Init() end
     ns:Print(("v%s loaded. /deed to open the panel, /deed help for commands.")
@@ -304,6 +309,28 @@ SlashCmdList.DEEDKEEPER = function(msg)
     elseif cmd == "tiptest" then
         if ns.UnitTooltip then ns.UnitTooltip:Report() end
 
+    elseif cmd == "sources" then
+        -- Is each kind of deed being fed at all, and with what? The last
+        -- signal's id is also how to find a spell or quest id for a deed.
+        ns:Print("signals seen this session:")
+        for _, kind in ipairs(ns.Kinds.ORDER) do
+            local s = ns.Engine.seen[kind]
+            if not s then
+                ns:Print(("  %s: none yet"):format(kind))
+            else
+                local l = s.last
+                local detail = {}
+                if l.cause then detail[#detail + 1] = "cause=" .. l.cause end
+                if l.emote then detail[#detail + 1] = "emote=" .. l.emote end
+                detail[#detail + 1] = "name=" .. tostring(l.names
+                    and table.concat(l.names, "/") or l.name)
+                detail[#detail + 1] = "id=" .. tostring(l.id or l.npcID)
+                detail[#detail + 1] = "zone=" .. tostring(l.zone)
+                ns:Print(("  %s: %d, last %s"):format(kind, s.count,
+                    table.concat(detail, " ")))
+            end
+        end
+
     elseif cmd == "rivals" then
         local t = ns.Engine:GetTracker(rest)
         if not t then
@@ -408,6 +435,8 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")
         ns:Print("  /deed commtest        test whether addon messages work (diagnostic)")
         ns:Print("  /deed tiptest         why a mob's tooltip does/doesn't list deeds (diagnostic)")
+        ns:Print("  /deed sources         what each deed type has seen this session,")
+        ns:Print("                        with the last name/id (finds spell ids)")
         ns:Print("  /deed simrival <id> <count> <name>")
         ns:Print("                        fake a rival, to test stealing solo")
         ns:Print("  /deed toasts [on|off|quiet|test]")

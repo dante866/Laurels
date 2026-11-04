@@ -23,7 +23,7 @@ local function makeClient(name, guid)
         for i = 1, select("#", ...) do p[i] = tostring((select(i, ...))) end
         table.insert(c.messages, table.concat(p, " "))
     end
-    for _, f in ipairs({ "Tracking/Engine.lua", "Rival/Ladder.lua", "Rival/Comm.lua", "Rival/Rival.lua" }) do
+    for _, f in ipairs({ "Tracking/Kinds.lua", "Tracking/Engine.lua", "Rival/Ladder.lua", "Rival/Comm.lua", "Rival/Rival.lua" }) do
         assert(loadfile(f))("Deedkeeper", ns)
     end
     -- Everyone contests the SAME published deed (shared uuid = as if adopted).
@@ -274,6 +274,20 @@ check("chat said so too", has(Ann, "took") and has(Ann, "from you"))
 farm(Ann, "Kobold", 2000) -- 3000, we take it back
 check("taking it back toasts", #seen == 2 and seen[2].kind == "took")
 check("naming who we took it from", seen[2] and seen[2].who == "Garrosh")
+
+-- Personal-deed keys. A kill deed's must not change now that other kinds
+-- add key parts, or its stored ladder entries would be orphaned.
+local KeyFor = function(t) return A.ns.Rival:KeyFor(t) end
+check("kill key unchanged", KeyFor({ event = "kill",
+    match = { nameContains = "Boar", npcIDs = { 3, 1 } } }) == "kill~n=boar~i=1,3")
+check("death causes key apart",
+    KeyFor({ event = "death", match = { cause = "falling" } })
+    ~= KeyFor({ event = "death", match = { cause = "drowning" } }))
+check("emotes key apart",
+    KeyFor({ event = "emote", match = { emote = "HUG" } })
+    ~= KeyFor({ event = "emote", match = { emote = "WAVE" } }))
+check("quest ids are in the key",
+    KeyFor({ event = "quest", match = { ids = { 62 } } }) == "quest~i=62")
 
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

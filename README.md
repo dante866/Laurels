@@ -51,6 +51,8 @@ regardless while you correct the number.
 - [x] Tracker definitions with ascending title **tiers**
 - [x] Pluggable **sources** feeding normalized "signals" into the engine
 - [x] **KillSource** — counts killing blows via the combat log (name / npcID match)
+- [x] **Quests, deaths, emotes, spell casts, fishing** — five more deed types
+  (see [Deed types](#deed-types))
 - [x] Per-character progress + account-wide definitions (SavedVariables)
 - [x] Single tabbed window (**Deeds** / **Nearby** / **New Deed**) + slash commands
 
@@ -136,7 +138,7 @@ Syntax-check every file (LuaJIT = Lua 5.1, matches WoW):
 
 Run all headless test suites (from the addon root):
 `luajit tools\test_engine.lua` · `test_ladder.lua` · `test_comm.lua` ·
-`test_rival.lua` · `test_killsource.lua`
+`test_rival.lua` · `test_killsource.lua` · `test_sources.lua`
 
 ## Install
 
@@ -185,6 +187,39 @@ Open the **New Deed** tab (or `/deed new`) and fill in two things:
 Every matching kill then counts, and the title is yours at 500. Check it
 without farming via `/deed test 500 Murloc`, and `/deed help` prints this same
 worked example in-game. To let others contest the title, `/deed publish <id>`.
+
+### Deed types
+
+The **Event** dropdown picks what a deed counts. Every type can be narrowed by
+a name filter and a zone; the labels change to say what the name refers to.
+
+| Type | Counts | Filters | Example |
+|---|---|---|---|
+| **Kill** | your killing blows | mob name, NPC IDs | 500 kills, name has "Murloc" |
+| **Quest** | quests turned in | quest title, quest IDs | 100 quests in Westfall |
+| **Death** | your deaths | cause, killer name, killer NPC IDs | 25 deaths, cause Falling |
+| **Emote** | emotes you perform | which emote, target name, target NPC IDs | 50 `/hug`s, target has "Rabbit" |
+| **Spell cast** | casts you finish, including item use and crafting | spell name, spell IDs | 100 Hearthstones |
+| **Fishing** | catches (one per loot window) | caught item name | 1000 catches |
+
+Kill and spell deeds need at least one filter — unfiltered they would count
+every kill or every internal cast. The others are fine unfiltered ("die 100
+times").
+
+Things to know:
+- **Quest zone** is where you *hand the quest in*, not where its objectives were.
+- **Death cause** comes from the last damage you took within 10 seconds of
+  dying. A death with nothing recent on record counts only for "any cause".
+  Feign Death never counts.
+- **Emotes** are typed as their slash command (`hug`, `lol`); the form turns
+  them into the client's emote token. A bare `/hug` uses your current target.
+- **Finding ids:** `/deed sources` prints the last thing each type saw this
+  session, with its id — cast a spell, then run it to read the spell id.
+
+Published deeds of the new types travel in the same `DEFPUB` layout as kill
+deeds (see `Rival/Comm.lua`), so a kill deed broadcasts exactly as it always
+did. An older Deedkeeper hearing a new type can accept it, but has no source
+for it, so it never counts there.
 
 **Competing with someone.** Publish a deed and nearby players can accept it:
 
@@ -243,9 +278,16 @@ deed for somewhere else: `/deed test 25 Dust Devil @Westfall`.
 
 ```
 Core.lua                 lifecycle, SavedVariables, slash commands, defaults
+Tracking/Kinds.lua       every deed type: labels, filters, descriptions
+Tracking/Signals.lua     shared signal helpers: zone, NPC id from GUID, combat log
 Tracking/Engine.lua      owns trackers; matches signals -> increments -> tiers
 Tracking/Sources/
   KillSource.lua         combat log -> { kind="kill", name, npcID }
+  QuestSource.lua        QUEST_TURNED_IN -> { kind="quest", id, name }
+  DeathSource.lua        PLAYER_DEAD + last hit -> { kind="death", cause, name, id }
+  EmoteSource.lua        DoEmote/PerformEmote hooks -> { kind="emote", emote, name, id }
+  SpellSource.lua        UNIT_SPELLCAST_SUCCEEDED -> { kind="spell", id, name }
+  FishSource.lua         fishing loot window -> { kind="fish", names }
 UI/MainFrame.lua         the window: sidebar menu, panes, lazy pane building
 UI/MiniPanel.lua         Deeds pane -- the tracker list
 UI/NearbyPanel.lua       Nearby pane -- challenges heard, with Accept
@@ -258,10 +300,10 @@ A **source** turns WoW events into normalized **signals**:
 `{ kind = "kill", name = "Kobold Vermin", npcID = 1234, zone = "Elwynn Forest",
 zoneID = 37, amount = 1 }`.
 The **engine** matches each signal against every tracker whose `event` equals the
-signal `kind`, applies the tracker's `match` criteria (`nameContains`, `npcIDs`,
-`zone`/`zoneID`),
-increments per-character progress, and resolves title tiers. Add new trackable things
-(quests, items, zones, emotes) by writing a new source — the engine doesn't change.
+signal `kind`, applies the tracker's `match` criteria (`nameContains`,
+`npcIDs`/`ids`, `zone`/`zoneID`, and `cause`/`emote` for deaths and emotes),
+increments per-character progress, and resolves title tiers. A new deed type is
+a new source plus an entry in `Tracking/Kinds.lua` — the engine doesn't change.
 
 Add a tracker from Lua (the in-game `/deed new` form is the normal route;
 this is for scripting or seeding defaults):

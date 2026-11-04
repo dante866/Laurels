@@ -7,6 +7,8 @@ local addonName, ns = ...
 -- A "signal" is a normalized event emitted by a source, e.g.
 --   { kind = "kill", name = "Kobold Vermin", npcID = 1234, amount = 1,
 --     zone = "Westfall", zoneID = 52 }
+-- Other kinds (quest, death, emote, spell, fish) carry `id` for their numeric
+-- id, plus `cause` or `emote` where the kind has one. See Tracking/Kinds.lua.
 --
 -- A "tracker" (stored in DeedkeeperDB.trackers) looks like:
 --   { id, name, event = "kill", match = {...}, tiers = { {count, title}, ... } }
@@ -21,20 +23,39 @@ Engine.sources = {}
 local function matches(criteria, signal)
     if not criteria then return true end
 
+    -- A signal names one thing, or several (a fishing catch is a loot window
+    -- of items); the text only has to appear in one of them.
     if criteria.nameContains then
-        if not signal.name then return false end
-        if not string.find(string.lower(signal.name),
-                           string.lower(criteria.nameContains), 1, true) then
-            return false
-        end
-    end
-
-    if criteria.npcIDs then
+        local needle = string.lower(criteria.nameContains)
+        local names = signal.names or { signal.name }
         local ok = false
-        for _, id in ipairs(criteria.npcIDs) do
-            if tonumber(id) == tonumber(signal.npcID) then ok = true break end
+        for _, n in ipairs(names) do
+            if type(n) == "string"
+               and string.find(string.lower(n), needle, 1, true) then
+                ok = true break
+            end
         end
         if not ok then return false end
+    end
+
+    -- Kill deeds and kill signals keep their original npcIDs/npcID keys;
+    -- every other kind uses ids/id. Same criterion either way.
+    local wanted = criteria.ids or criteria.npcIDs
+    if wanted then
+        local have = tonumber(signal.id or signal.npcID)
+        local ok = false
+        for _, id in ipairs(wanted) do
+            if tonumber(id) == have then ok = true break end
+        end
+        if not ok then return false end
+    end
+
+    -- The two kind-specific qualifiers. Each only constrains signals of the
+    -- kind that carries it, because only deeds of that kind ever set it.
+    if criteria.cause and criteria.cause ~= signal.cause then return false end
+    if criteria.emote
+       and string.upper(criteria.emote) ~= string.upper(signal.emote or "") then
+        return false
     end
 
     -- Optional zone scoping, so a deed can be "Kobolds of Elwynn" rather than
@@ -121,7 +142,17 @@ function Engine:TrackersMatching(signal)
     return out
 end
 
+-- Per-kind tally of signals seen this session, for /deed sources. Answers
+-- "is this source firing at all?" in game, and the last signal shows the
+-- exact name and id a source reported -- the easy way to find a spell id.
+Engine.seen = {}
+
 function Engine:ReportProgress(signal)
+    local s = self.seen[signal.kind] or { count = 0 }
+    s.count = s.count + 1
+    s.last = signal
+    self.seen[signal.kind] = s
+
     local amount = signal.amount or 1
     for _, t in ipairs(self:TrackersMatching(signal)) do
         self:Increment(t, amount)
@@ -202,6 +233,7 @@ function Engine:UpdateTracker(id, changes)
     if not t then return nil end
 
     if changes.name then t.name = changes.name end
+    if changes.event then t.event = changes.event end
     if changes.match then t.match = changes.match end
     if changes.tiers then
         t.tiers = changes.tiers

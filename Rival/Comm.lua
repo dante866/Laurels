@@ -170,7 +170,18 @@ end
 -- DEFPUB carries a whole deed definition, not just a claim, so a rival can
 -- adopt it without being told a uuid by hand. Layout is a fixed header then
 -- variable count/title pairs:
---   DEFPUB|uuid|guid|ver|name|event|nameContains|npcIDs|zone|zoneID|c|t|c|t...
+--   DEFPUB|uuid|guid|ver|name|event|nameContains|ids|zone|zoneID|c|t|c|t...
+--
+-- Deed kinds beyond kills were added without changing that layout, because
+-- the strict version gate means a new PROTO cuts new clients off from old
+-- ones entirely. Instead:
+--   * `ids` holds whichever id list the kind uses (NPC, quest or spell ids),
+--     decoded back to `npcIDs` for kill deeds and `ids` for the rest;
+--   * a kind's qualifier (a death cause, an emote) rides in the event field
+--     as "kind:value", e.g. "death:falling", "emote:HUG".
+-- So a kill deed encodes byte-for-byte as it always did. An older client
+-- hearing a new kind sees an event name it has no source for, and the deed
+-- simply never counts there.
 --
 -- Addon messages are capped at 255 bytes, and an over-long one fails to send
 -- with a result code we would misread as the channel refusing us. So the
@@ -180,11 +191,16 @@ Comm.MAX_BODY = 240
 function Comm:EncodeDef(msg, tierLimit)
     local d = msg.def or {}
     local m = d.match or {}
+    local event = d.event or "kill"
+    local kind = ns.Kinds and ns.Kinds.Get(event)
+    local qualifier = kind and kind.qualifier and m[kind.qualifier]
+    if qualifier then event = event .. ":" .. tostring(qualifier) end
+    local ids = m.ids or m.npcIDs
     local parts = {
         self.PROTO, "DEFPUB", esc(d.uuid), esc(msg.guid), esc(msg.ver),
-        esc(d.name), esc(d.event or "kill"),
+        esc(d.name), esc(event),
         esc(m.nameContains),
-        esc(m.npcIDs and table.concat(m.npcIDs, ",") or ""),
+        esc(ids and table.concat(ids, ",") or ""),
         esc(m.zone), tostring(m.zoneID or ""),
     }
     local tiers = d.tiers or {}
@@ -218,6 +234,14 @@ function Comm:Decode(body)
         return { proto = proto, type = "ASK", deedKey = unesc(f[3]) }
     elseif t == "DEFPUB" then
         local m = {}
+        local event, qualifier = string.match(orNil(unesc(f[7])) or "kill", "^([^:]*):?(.*)$")
+        if event == "" then event = "kill" end
+        local kind = ns.Kinds and ns.Kinds.Get(event)
+        if kind and kind.qualifier and qualifier ~= "" then
+            m[kind.qualifier] = qualifier
+        end
+        local idsKey = (event == "kill") and "npcIDs" or "ids"
+
         local nameContains = orNil(unesc(f[8]))
         if nameContains then m.nameContains = nameContains end
 
@@ -228,7 +252,7 @@ function Comm:Decode(body)
                 local n = tonumber(tok)
                 if n then list[#list + 1] = n end
             end
-            if #list > 0 then m.npcIDs = list end
+            if #list > 0 then m[idsKey] = list end
         end
 
         local zone = orNil(unesc(f[10]))
@@ -251,7 +275,7 @@ function Comm:Decode(body)
             uuid = orNil(unesc(f[3])), guid = orNil(unesc(f[4])),
             ver = unesc(f[5]),
             def = { uuid = orNil(unesc(f[3])), name = unesc(f[6]),
-                    event = orNil(unesc(f[7])) or "kill",
+                    event = event,
                     match = m, tiers = tiers } }
     end
     return { proto = proto, type = t }

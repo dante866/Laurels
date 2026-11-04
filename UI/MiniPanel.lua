@@ -45,21 +45,6 @@ local function buildDeedsPane(f)
     f.rows = {}
 end
 
--- One-line summary of what a deed counts, for the tooltip.
-local function describeMatch(m)
-    if not m then return "anything" end
-    local parts = {}
-    if m.nameContains then
-        table.insert(parts, ('name has "%s"'):format(m.nameContains))
-    end
-    if m.npcIDs and #m.npcIDs > 0 then
-        table.insert(parts, ("%d NPC ID%s"):format(
-            #m.npcIDs, #m.npcIDs == 1 and "" or "s"))
-    end
-    if m.zone then table.insert(parts, "in " .. m.zone)
-    elseif m.zoneID then table.insert(parts, "in map " .. tostring(m.zoneID)) end
-    return (#parts > 0) and table.concat(parts, ", ") or "anything"
-end
 
 -- The id is the thing you need for /deed publish, reset and rivals, and it is
 -- otherwise only visible via /deed list -- so the row shows it and the tooltip
@@ -81,7 +66,8 @@ local function showRowTooltip(row)
         GameTooltip:AddLine(("Next: %s at %d"):format(nextTier.title, nextTier.count),
             0.6, 0.6, 0.6)
     end
-    GameTooltip:AddLine(("Counts: %s"):format(describeMatch(t.match)), 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(("Counts: %s"):format(ns.Kinds.Describe(t.event, t.match)),
+        0.6, 0.6, 0.6)
     GameTooltip:AddLine(("Published: %s"):format(t.published and "yes" or "no"),
         0.6, 0.6, 0.6)
     if t.published and t.uuid then

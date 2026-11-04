@@ -16,17 +16,7 @@ ns.Nearby = Nearby
 local ROWS = 6
 
 local function describe(d)
-    local m = d.match or {}
-    local parts = {}
-    if m.nameContains then
-        parts[#parts + 1] = ('name has "%s"'):format(m.nameContains)
-    end
-    if m.npcIDs and #m.npcIDs > 0 then
-        parts[#parts + 1] = ("%d NPC ID%s"):format(
-            #m.npcIDs, #m.npcIDs == 1 and "" or "s")
-    end
-    if m.zone then parts[#parts + 1] = "in " .. m.zone end
-    return (#parts > 0) and table.concat(parts, ", ") or "anything"
+    return ns.Kinds.Describe(d.event, d.match)
 end
 
 local function showTooltip(row)
