@@ -196,7 +196,7 @@ a name filter and a zone; the labels change to say what the name refers to.
 | Type | Counts | Filters | Example |
 |---|---|---|---|
 | **Kill** | your killing blows | mob name, NPC IDs | 500 kills, name has "Murloc" |
-| **Melee swing** | your auto-attacks that deal damage | weapon (sword, axe, mace, dagger, fist, staff, polearm, unarmed), target name, target NPC IDs | 1000 hits with a sword |
+| **Melee swing** | your auto-attacks that deal damage | weapon (sword, axe or mace — either hand, or one-/two-handed only; dagger, fist, staff, polearm, unarmed), target name, target NPC IDs | 1000 hits with a sword |
 | **Quest** | quests turned in | quest title, quest IDs | 100 quests in Westfall |
 | **Death** | your deaths | cause, killer name, killer NPC IDs | 25 deaths, cause Falling |
 | **Emote** | emotes you perform | which emote, target name, target NPC IDs | 50 `/hug`s, target has "Rabbit" |
@@ -210,7 +210,8 @@ times").
 Things to know:
 - **Melee swings** count hits, not misses, dodges or parries. Special attacks
   (Heroic Strike) are spell casts, not swings. Dual-wielding, each hit counts
-  for the weapon in the hand that swung; one- and two-handed count the same.
+  for the weapon in the hand that swung. "Sword" takes one- and two-handed
+  swords; "One-handed sword" and "Two-handed sword" take only that kind.
 - **Quest zone** is where you *hand the quest in*, not where its objectives were.
 - **Death cause** comes from the last damage you took within 10 seconds of
   dying. A death with nothing recent on record counts only for "any cause".

@@ -53,7 +53,11 @@ local function matches(criteria, signal)
     -- The kind-specific qualifiers. Each only constrains signals of the kind
     -- that carries it, because only deeds of that kind ever set it.
     if criteria.cause and criteria.cause ~= signal.cause then return false end
-    if criteria.weapon and criteria.weapon ~= signal.weapon then return false end
+    -- A weapon choice is either exact ("sword2h") or a family ("sword").
+    if criteria.weapon and criteria.weapon ~= signal.weapon
+       and criteria.weapon ~= signal.weaponFamily then
+        return false
+    end
     if criteria.emote
        and string.upper(criteria.emote) ~= string.upper(signal.emote or "") then
         return false

@@ -132,6 +132,10 @@ local ns = {
         deed("swordhits", "swing", { weapon = "sword" }),
         deed("daggerhits","swing", { weapon = "dagger" }),
         deed("axehits",   "swing", { weapon = "axe" }),
+        deed("sword1h",   "swing", { weapon = "sword1h" }),
+        deed("sword2h",   "swing", { weapon = "sword2h" }),
+        deed("axe2h",     "swing", { weapon = "axe2h" }),
+        deed("axe1h",     "swing", { weapon = "axe1h" }),
         deed("fisticuffs","swing", { weapon = "unarmed" }),
         deed("boarsword", "swing", { weapon = "sword", nameContains = "Boar" }),
     } },
@@ -300,6 +304,7 @@ check("swing: a main-hand sword hit counts", p("swordhits") == 1)
 check("swing: any-weapon deed counts it", p("anyswing") == 1)
 check("swing: target filter matches", p("boarsword") == 1)
 check("swing: a sword isn't a dagger", p("daggerhits") == 0)
+check("swing: a one-handed sword is one-handed", p("sword1h") == 1 and p("sword2h") == 0)
 
 swing("SWING_DAMAGE", PLAYER, true)
 check("swing: an off-hand hit uses the off-hand weapon", p("daggerhits") == 1)
@@ -321,11 +326,13 @@ check("swing: cached weapon until gear changes", p("swordhits") == 3 and p("axeh
 fire("PLAYER_EQUIPMENT_CHANGED")
 swing("SWING_DAMAGE", PLAYER, false)
 check("swing: two-handed axe counts as axe", p("axehits") == 1)
+check("swing: and as a two-handed axe, not a one-handed one", p("axe2h") == 1 and p("axe1h") == 0)
 
 equipped[16] = 1004 -- a two-handed sword
 fire("PLAYER_EQUIPMENT_CHANGED")
 swing("SWING_DAMAGE", PLAYER, false)
 check("swing: two-handed sword counts as sword", p("swordhits") == 4)
+check("swing: and as two-handed only", p("sword2h") == 1 and p("sword1h") == 3)
 
 equipped[16], equipped[17] = nil, nil
 fire("PLAYER_EQUIPMENT_CHANGED")
@@ -342,6 +349,7 @@ check("describe: emote with target", D("emote", { emote = "HUG", nameContains = 
     == 'emotes: /hug, target name has "Rabbit"')
 check("describe: ids", D("spell", { ids = { 8690, 8691 } }) == "casts: 2 spell IDs")
 check("describe: weapon", D("swing", { weapon = "sword" }) == "melee hits: sword")
+check("describe: weapon variant", D("swing", { weapon = "sword2h" }) == "melee hits: two-handed sword")
 check("describe: unknown kind says so", D("haircut", {}):find("can't count") ~= nil)
 
 print(("\n%d passed, %d failed"):format(passed, failed))

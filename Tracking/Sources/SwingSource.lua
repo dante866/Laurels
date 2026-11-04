@@ -5,9 +5,11 @@ local addonName, ns = ...
 --
 -- Only SWING_DAMAGE counts: misses, dodges and parries deal no damage, and
 -- special attacks (Heroic Strike, Sinister Strike) are spell casts, which
--- spell deeds already count. The signal names the weapon family in the hand
--- that swung -- SWING_DAMAGE flags off-hand hits -- so a dual-wielder with a
--- sword and a dagger feeds a Sword deed only from the sword's hits.
+-- spell deeds already count. The signal names the weapon in the hand that
+-- swung -- SWING_DAMAGE flags off-hand hits -- so a dual-wielder with a
+-- sword and a dagger feeds a Sword deed only from the sword's hits. It names
+-- both the exact weapon ("sword2h") and its family ("sword"), so a deed can
+-- ask for either.
 -- ---------------------------------------------------------------------------
 
 local SwingSource = {}
@@ -15,7 +17,7 @@ ns.SwingSource = SwingSource
 
 local MAIN_HAND, OFF_HAND = 16, 17
 
--- Weapon item subclass ids -> family. The ids are the client's item
+-- Weapon item subclass ids -> weapon. The ids are the client's item
 -- subclass numbering, unchanged since vanilla; they aren't in the Forever
 -- dump, so Enum.ItemWeaponSubclass is preferred when a client has it.
 -- Read by subclass id rather than name, which would be localized.
@@ -23,16 +25,24 @@ local function familyTable()
     local E = Enum and Enum.ItemWeaponSubclass
     local function id(key, fallback) return (E and E[key]) or fallback end
     return {
-        [id("Axe1H", 0)]     = "axe",     [id("Axe2H", 1)]   = "axe",
-        [id("Mace1H", 4)]    = "mace",    [id("Mace2H", 5)]  = "mace",
+        [id("Axe1H", 0)]     = "axe1h",   [id("Axe2H", 1)]   = "axe2h",
+        [id("Mace1H", 4)]    = "mace1h",  [id("Mace2H", 5)]  = "mace2h",
         [id("Polearm", 6)]   = "polearm",
-        [id("Sword1H", 7)]   = "sword",   [id("Sword2H", 8)] = "sword",
+        [id("Sword1H", 7)]   = "sword1h", [id("Sword2H", 8)] = "sword2h",
         [id("Staff", 10)]    = "staff",
         [id("Unarmed", 13)]  = "fist",    -- fist weapons
         [id("Dagger", 15)]   = "dagger",
     }
 end
 SwingSource.FAMILY = familyTable()
+
+-- Variants roll up to their family, so a plain "Sword" deed takes both.
+-- Weapons without variants are their own family.
+SwingSource.PARENT = {
+    sword1h = "sword", sword2h = "sword",
+    axe1h   = "axe",   axe2h   = "axe",
+    mace1h  = "mace",  mace2h  = "mace",
+}
 
 local function itemSubclass(itemID)
     local info = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
@@ -41,8 +51,8 @@ local function itemSubclass(itemID)
     if ok then return classID, subClassID end
 end
 
--- The family of the weapon in a slot: "unarmed" with nothing there, "other"
--- for anything held that isn't a melee family (a fishing pole, say).
+-- The weapon in a slot: "unarmed" with nothing there, "other" for anything
+-- held that isn't a melee weapon (a fishing pole, say).
 function SwingSource.WeaponIn(slot)
     local itemID = GetInventoryItemID and GetInventoryItemID("player", slot)
     if not itemID then return "unarmed" end
@@ -83,9 +93,11 @@ function SwingSource:OnCombatLog(...)
     if subevent ~= "SWING_DAMAGE" then return end
     if sourceGUID ~= UnitGUID("player") then return end
     local offHand = select(21, ...) and true or false
+    local weapon = self:Weapon(offHand)
 
     self.engine:ReportProgress(ns.Signals.Make("swing", {
-        weapon = self:Weapon(offHand),
+        weapon       = weapon,
+        weaponFamily = self.PARENT[weapon] or weapon,
         name   = destName,
         id     = ns.Signals.NpcID(destGUID),
     }))

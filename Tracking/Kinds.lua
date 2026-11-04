@@ -47,17 +47,21 @@ Kinds.CAUSES = {
     },
 }
 
--- Weapon families: one- and two-handed versions count as the same family,
--- so a Sword deed takes either. `other` (a fishing pole, say) is never
--- offered as a filter.
+-- Weapons. Swords, axes and maces come as a family ("sword": either hand
+-- counts) and as each variant ("sword1h", "sword2h"); a swing signal carries
+-- both its exact weapon and its family, so either kind of choice matches.
+-- `other` (a fishing pole, say) is never offered as a filter.
 Kinds.WEAPONS = {
     any = "Any weapon",
-    order = { "sword", "axe", "mace", "dagger", "fist", "staff", "polearm",
-              "unarmed" },
+    order = { "sword", "sword1h", "sword2h", "axe", "axe1h", "axe2h",
+              "mace", "mace1h", "mace2h", "dagger", "fist", "staff",
+              "polearm", "unarmed" },
     labels = {
-        sword = "Sword", axe = "Axe", mace = "Mace", dagger = "Dagger",
-        fist = "Fist weapon", staff = "Staff", polearm = "Polearm",
-        unarmed = "Unarmed",
+        sword = "Sword", sword1h = "One-handed sword", sword2h = "Two-handed sword",
+        axe   = "Axe",   axe1h   = "One-handed axe",   axe2h   = "Two-handed axe",
+        mace  = "Mace",  mace1h  = "One-handed mace",  mace2h  = "Two-handed mace",
+        dagger = "Dagger", fist = "Fist weapon", staff = "Staff",
+        polearm = "Polearm", unarmed = "Unarmed",
     },
 }
 
