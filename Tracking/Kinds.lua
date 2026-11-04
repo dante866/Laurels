@@ -25,7 +25,8 @@ local addonName, ns = ...
 local Kinds = {}
 ns.Kinds = Kinds
 
-Kinds.ORDER = { "kill", "swing", "quest", "death", "emote", "spell", "fish", "hold" }
+Kinds.ORDER = { "kill", "swing", "pvp", "boss", "quest", "death", "duel", "emote",
+                "spell", "loot", "roll", "fish", "flight", "hold" }
 
 -- Qualifier lists, in menu order. `any` labels the unfiltered choice.
 --
@@ -63,6 +64,42 @@ Kinds.WEAPONS = {
         dagger = "Dagger", fist = "Fist weapon", staff = "Staff",
         polearm = "Polearm", unarmed = "Unarmed",
     },
+}
+
+-- Player-kill targets: a faction or a class, picked from one list. A player
+-- kill signal carries both, and either matches (see Engine's matcher).
+Kinds.PVP_TARGETS = {
+    any = "Any player",
+    order = { "alliance", "horde", "warrior", "paladin", "hunter", "rogue",
+              "priest", "shaman", "mage", "warlock", "druid", "deathknight",
+              "monk" },
+    labels = {
+        alliance = "Alliance", horde = "Horde", warrior = "Warrior",
+        paladin = "Paladin", hunter = "Hunter", rogue = "Rogue",
+        priest = "Priest", shaman = "Shaman", mage = "Mage",
+        warlock = "Warlock", druid = "Druid", deathknight = "Death Knight",
+        monk = "Monk",
+    },
+}
+
+Kinds.DUEL_RESULTS = {
+    any = "Won or lost",
+    order = { "won", "lost" },
+    labels = { won = "Won", lost = "Lost" },
+}
+
+-- Item quality by name rather than number, for readable deeds and wire text.
+Kinds.QUALITIES = {
+    any = "Any quality",
+    order = { "poor", "common", "uncommon", "rare", "epic", "legendary" },
+    labels = { poor = "Poor", common = "Common", uncommon = "Uncommon",
+               rare = "Rare", epic = "Epic", legendary = "Legendary" },
+}
+
+Kinds.ROLLS = {
+    any = "Any roll",
+    order = { "need", "greed", "pass" },
+    labels = { need = "Need", greed = "Greed", pass = "Pass" },
 }
 
 Kinds.defs = {
@@ -110,6 +147,40 @@ Kinds.defs = {
         nameLabel = "Catch name has",
         -- No ids: a catch is a loot window, and item ids aren't asked for.
         zoneHint = "optional \226\128\147 only counts catches in that zone",
+    },
+    pvp = {
+        label = "Player kill", plural = "player kills",
+        nameLabel = "Victim name has",
+        qualifier = "target", choices = Kinds.PVP_TARGETS,
+        zoneHint = "optional \226\128\147 only counts kills in that zone",
+    },
+    boss = {
+        label = "Boss kill", plural = "boss kills",
+        nameLabel = "Boss name has", idsLabel = "Encounter IDs", idNoun = "encounter ID",
+        zoneHint = "optional \226\128\147 only counts kills in that zone",
+    },
+    duel = {
+        label = "Duel", plural = "duels",
+        nameLabel = "Opponent name has",
+        qualifier = "result", choices = Kinds.DUEL_RESULTS,
+        zoneHint = "optional \226\128\147 only counts duels in that zone",
+    },
+    loot = {
+        label = "Loot an item", plural = "items looted",
+        nameLabel = "Item name has", idsLabel = "Item IDs", idNoun = "item ID",
+        qualifier = "quality", choices = Kinds.QUALITIES,
+        zoneHint = "optional \226\128\147 only counts loot in that zone",
+    },
+    roll = {
+        label = "Loot roll", plural = "loot rolls",
+        nameLabel = "Item name has", idsLabel = "Item IDs", idNoun = "item ID",
+        qualifier = "roll", choices = Kinds.ROLLS,
+        zoneHint = "optional \226\128\147 only counts rolls in that zone",
+    },
+    flight = {
+        label = "Flight", plural = "flights taken",
+        nameLabel = "Destination has",
+        zoneHint = "optional \226\128\147 the zone you fly from",
     },
     -- "Title Hoarder": how many contested deeds you currently lead. Its
     -- progress is worked out from the ladders, not counted from events

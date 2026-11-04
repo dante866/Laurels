@@ -110,6 +110,11 @@ local function initModules()
     ns.Engine:RegisterSource("spell", ns.SpellSource)
     ns.Engine:RegisterSource("fish", ns.FishSource)
     ns.Engine:RegisterSource("hold", ns.HoldSource)
+    ns.Engine:RegisterSource("duel", ns.DuelSource)
+    ns.Engine:RegisterSource("loot", ns.LootSource)
+    ns.Engine:RegisterSource("flight", ns.FlightSource)
+    ns.Engine:RegisterSource("roll", ns.RollSource)
+    ns.Engine:RegisterSource("boss", ns.BossSource)
     if ns.UI and ns.UI.Init then ns.UI:Init() end
     if ns.MinimapButton then ns.MinimapButton:Init() end
     if ns.Rival and ns.Rival.Init then ns.Rival:Init() end
@@ -336,6 +341,9 @@ SlashCmdList.LAURELS = function(msg)
                 local detail = {}
                 if l.cause then detail[#detail + 1] = "cause=" .. l.cause end
                 if l.weapon then detail[#detail + 1] = "weapon=" .. l.weapon end
+                for _, k in ipairs({ "result", "quality", "roll", "faction", "class" }) do
+                    if l[k] then detail[#detail + 1] = k .. "=" .. l[k] end
+                end
                 if l.emote then detail[#detail + 1] = "emote=" .. l.emote end
                 detail[#detail + 1] = "name=" .. tostring(l.names
                     and table.concat(l.names, "/") or l.name)

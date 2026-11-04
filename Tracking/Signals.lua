@@ -54,6 +54,64 @@ function Signals.CombatLog(...)
     if CombatLogGetCurrentEventInfo then return CombatLogGetCurrentEventInfo() end
 end
 
+-- Match a chat line against one of the client's own format strings
+-- (GlobalStrings such as LOOT_ITEM_SELF = "You receive loot: %s."), so the
+-- match works in every language the client ships. Returns the arguments by
+-- their position in the format -- positional forms like "%2$s" are honoured,
+-- since translations reorder them -- or nil when the line doesn't match.
+local patternCache = {}
+
+local function formatPattern(fmt)
+    local cached = patternCache[fmt]
+    if cached then return cached[1], cached[2] end
+    local out, order, auto, i = {}, {}, 0, 1
+    while i <= #fmt do
+        local pos, kind, nextI = string.match(fmt, "^%%(%d*)%$?([sd])()", i)
+        if kind then
+            auto = auto + 1
+            order[#order + 1] = tonumber(pos) or auto
+            out[#out + 1] = (kind == "d") and "(%d+)" or "(.+)"
+            i = nextI
+        elseif string.sub(fmt, i, i + 1) == "%%" then
+            out[#out + 1] = "%%"
+            i = i + 2
+        else
+            local c = string.sub(fmt, i, i)
+            out[#out + 1] = string.find(c, "[%^%$%(%)%%%.%[%]%*%+%-%?]") and ("%" .. c) or c
+            i = i + 1
+        end
+    end
+    local pattern = "^" .. table.concat(out) .. "$"
+    patternCache[fmt] = { pattern, order }
+    return pattern, order
+end
+
+function Signals.MatchFormat(text, fmt)
+    if type(text) ~= "string" or type(fmt) ~= "string" then return nil end
+    local pattern, order = formatPattern(fmt)
+    local caps = { string.match(text, pattern) }
+    if #caps == 0 then return nil end
+    local args = {}
+    for k, argPos in ipairs(order) do args[argPos] = caps[k] end
+    return args
+end
+
+-- Item quality names by the colour an item link is drawn in -- the same in
+-- every client, and available without the item being cached.
+local QUALITY_BY_COLOUR = {
+    ["9d9d9d"] = "poor", ["ffffff"] = "common", ["1eff00"] = "uncommon",
+    ["0070dd"] = "rare", ["a335ee"] = "epic", ["ff8000"] = "legendary",
+}
+
+-- An item link's id, name and quality name.
+function Signals.ItemFromLink(link)
+    if type(link) ~= "string" then return nil end
+    local id = tonumber(string.match(link, "item:(%d+)"))
+    local name = string.match(link, "%[(.-)%]")
+    local colour = string.match(link, "|c%x%x(%x%x%x%x%x%x)")
+    return id, name, colour and QUALITY_BY_COLOUR[string.lower(colour)]
+end
+
 -- A signal of `kind`, stamped with where it happened.
 function Signals.Make(kind, fields)
     fields.kind = kind

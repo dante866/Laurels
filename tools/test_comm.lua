@@ -166,6 +166,12 @@ check("emote target filter survives", e.match.nameContains == "Rabbit")
 local s = roundTrip({ uuid = "U", name = "Sword Master", event = "swing",
     match = { weapon = "sword" }, tiers = tiers })
 check("swing weapon survives", s.event == "swing" and s.match.weapon == "sword")
+for _, c in ipairs({ { "pvp", "target", "horde" }, { "duel", "result", "won" },
+        { "loot", "quality", "epic" }, { "roll", "roll", "need" } }) do
+    local back = roundTrip({ uuid = "U", name = "N", event = c[1],
+        match = { [c[2]] = c[3] }, tiers = tiers })
+    check(c[1] .. " " .. c[2] .. " survives", back.event == c[1] and back.match[c[2]] == c[3])
+end
 
 local q = roundTrip({ uuid = "U", name = "Mines", event = "quest",
     match = { ids = { 62, 76 } }, tiers = tiers })

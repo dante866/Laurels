@@ -33,6 +33,11 @@ Tracking\Sources\EmoteSource.lua
 Tracking\Sources\SpellSource.lua
 Tracking\Sources\FishSource.lua
 Tracking\Sources\HoldSource.lua
+Tracking\Sources\DuelSource.lua
+Tracking\Sources\LootSource.lua
+Tracking\Sources\FlightSource.lua
+Tracking\Sources\RollSource.lua
+Tracking\Sources\BossSource.lua
 Rival\Ladder.lua
 Rival\Comm.lua
 Rival\Rival.lua

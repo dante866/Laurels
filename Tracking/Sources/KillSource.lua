@@ -24,6 +24,32 @@ function KillSource.SignalFor(name, guid)
     return ns.Signals.Make("kill", { name = name, npcID = ns.Signals.NpcID(guid) })
 end
 
+-- Factions by the combat log's English race names, which don't change with
+-- the client's language. Pandaren pick a side at level 10 and their race
+-- doesn't say which, so they carry no faction (class filters still work).
+local FACTION = {
+    Human = "alliance", Dwarf = "alliance", NightElf = "alliance",
+    Gnome = "alliance", Draenei = "alliance", Worgen = "alliance",
+    Orc = "horde", Scourge = "horde", Tauren = "horde", Troll = "horde",
+    BloodElf = "horde", Goblin = "horde",
+}
+
+-- A killing blow on another player: the player-kill deed's signal, with the
+-- victim's class and faction. Nil for anything that isn't a player, or a
+-- player the client can't describe (GetPlayerInfoByGUID has nothing on them).
+function KillSource.PvpSignalFor(name, guid)
+    if type(guid) ~= "string" or not guid:find("^Player") or not GetPlayerInfoByGUID then
+        return nil
+    end
+    local ok, _, englishClass, _, englishRace = pcall(GetPlayerInfoByGUID, guid)
+    if not ok then return nil end
+    return ns.Signals.Make("pvp", {
+        name    = name,
+        class   = englishClass and string.lower(englishClass):gsub("_", "") or nil,
+        faction = englishRace and FACTION[englishRace] or nil,
+    })
+end
+
 function KillSource:Init(engine)
     self.engine = engine
     if self.frame then return end
@@ -73,4 +99,8 @@ function KillSource:OnCombatLog(event, ...)
     if sourceGUID ~= playerGUID and sourceGUID ~= petGUID then return end
 
     self.engine:ReportProgress(KillSource.SignalFor(destName, destGUID))
+    -- A player victim is also a player kill. Kill deeds still see it too,
+    -- as they always have; only a name filter would ever match a player.
+    local pvp = KillSource.PvpSignalFor(destName, destGUID)
+    if pvp then self.engine:ReportProgress(pvp) end
 end

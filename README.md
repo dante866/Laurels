@@ -151,7 +151,7 @@ Syntax-check every file (LuaJIT = Lua 5.1, matches WoW):
 
 Run all headless test suites (from the addon root):
 `luajit tools\test_engine.lua` · `test_ladder.lua` · `test_comm.lua` ·
-`test_rival.lua` · `test_killsource.lua` · `test_sources.lua` · `test_trp3.lua`
+`test_rival.lua` · `test_killsource.lua` · `test_sources.lua` · `test_sources2.lua` · `test_trp3.lua`
 
 ## Install
 
@@ -219,6 +219,12 @@ a name filter and a zone; the labels change to say what the name refers to.
 | **Emote** | emotes you perform | which emote, target name, target NPC IDs | 50 `/hug`s, target has "Rabbit" |
 | **Spell cast** | casts you finish, including item use and crafting | spell name, spell IDs | 100 Hearthstones |
 | **Fishing** | catches (one per loot window) | caught item name | 1000 catches |
+| **Player kill** | killing blows on other players | faction or class, victim name | 50 Horde |
+| **Boss kill** | dungeon and raid bosses your group kills | boss name, encounter IDs | 10 Onyxia kills |
+| **Duel** | duels you win or lose | won / lost, opponent name | 25 duels won |
+| **Loot an item** | items you loot, by stack size | quality, item name, item IDs | 500 Linen Cloth |
+| **Loot roll** | Need, Greed and Pass clicks | which roll, item name, item IDs | Need on 100 items |
+| **Flight** | flights you take | destination name; zone is where you take off | 50 flights |
 | **Titles held** | contested deeds you currently lead | deed name | *Title Hoarder*: lead 5 |
 
 Kill and spell deeds need at least one filter — unfiltered they would count
@@ -232,6 +238,16 @@ when someone takes one from you. A title you've earned from it is kept. Only
 publishing deeds nobody else plays doesn't make you a hoarder.
 
 Things to know:
+- **Player kills** are killing blows, like kill deeds. Factions come from the
+  victim's race; Pandaren don't say which side they chose, so only class
+  filters catch them.
+- **Duels** and **loot** read the game's own messages through its own
+  templates, so they work in any game language.
+- **Boss kills** count the group's kill, not just your killing blow. Whether
+  Forever reports them for its dungeons is unconfirmed; a kill deed on the
+  boss's NPC ID works either way.
+- **Loot rolls** count when you click, even if you then cancel a Bind on
+  Pickup warning.
 - **Melee swings** count hits, not misses, dodges or parries. Special attacks
   (Heroic Strike) are spell casts, not swings. Dual-wielding, each hit counts
   for the weapon in the hand that swung. "Sword" takes one- and two-handed
@@ -333,6 +349,11 @@ Tracking/Sources/
   SpellSource.lua        UNIT_SPELLCAST_SUCCEEDED -> { kind="spell", id, name }
   FishSource.lua         fishing loot window -> { kind="fish", names }
   HoldSource.lua         ladders -> how many contested deeds you lead (set, not counted)
+  DuelSource.lua         your duel results, from the system line -> { kind="duel", result, name }
+  LootSource.lua         your loot line -> { kind="loot", id, name, quality, amount }
+  FlightSource.lua       TakeTaxiNode + take-off -> { kind="flight", name }
+  RollSource.lua         RollOnLoot hook -> { kind="roll", roll, id, name }
+  BossSource.lua         ENCOUNTER_END / BOSS_KILL -> { kind="boss", id, name }
 Integrations/TRP3.lua    TRP3 names for rivals and authors (inert without TRP3)
 UI/MainFrame.lua         the window: sidebar menu, panes, lazy pane building
 UI/MiniPanel.lua         Deeds pane -- the tracker list

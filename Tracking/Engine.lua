@@ -62,7 +62,14 @@ local function matches(criteria, signal)
 
     -- The kind-specific qualifiers. Each only constrains signals of the kind
     -- that carries it, because only deeds of that kind ever set it.
-    if criteria.cause and criteria.cause ~= signal.cause then return false end
+    for _, key in ipairs({ "cause", "result", "quality", "roll" }) do
+        if criteria[key] and criteria[key] ~= signal[key] then return false end
+    end
+    -- A player-kill target is a faction or a class; the signal carries both.
+    if criteria.target and criteria.target ~= signal.faction
+       and criteria.target ~= signal.class then
+        return false
+    end
     -- A weapon choice is either exact ("sword2h") or a family ("sword").
     if criteria.weapon and criteria.weapon ~= signal.weapon
        and criteria.weapon ~= signal.weaponFamily then

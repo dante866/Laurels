@@ -81,6 +81,9 @@ function Rival:KeyFor(tracker)
     end
     if m.cause then parts[#parts + 1] = "c=" .. m.cause end
     if m.weapon then parts[#parts + 1] = "w=" .. m.weapon end
+    for _, k in ipairs({ "target", "result", "quality", "roll" }) do
+        if m[k] then parts[#parts + 1] = k:sub(1, 1) .. k:sub(-1) .. "=" .. m[k] end
+    end
     if m.emote then parts[#parts + 1] = "e=" .. string.upper(m.emote) end
     return table.concat(parts, "~")
 end
