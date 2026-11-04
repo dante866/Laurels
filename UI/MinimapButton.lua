@@ -60,11 +60,13 @@ local function makeButton()
     bg:SetPoint("TOPLEFT", 7, -5)
     bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
 
-    -- The wreath is our own art (tools/make_icon.ps1), not a game icon, and
-    -- fills the dark disc exactly.
+    -- The wreath is our own art (tools/make_icon.ps1), not a game icon. It
+    -- sits 1px left and 1px down of the dark disc: at the disc's own offset
+    -- it looked high and right in the ring in game (judged by eye, since the
+    -- ring texture's hole isn't exactly centred either).
     local icon = b:CreateTexture(nil, "ARTWORK")
     icon:SetSize(20, 20)
-    icon:SetPoint("TOPLEFT", 7, -5)
+    icon:SetPoint("TOPLEFT", 6, -6)
     icon:SetTexture(ICON)
 
     b:SetScript("OnEnter", function(self)
