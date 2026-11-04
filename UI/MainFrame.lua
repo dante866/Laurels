@@ -50,13 +50,23 @@ Main.TAB_ORDER = { "deeds", "nearby", "author" }
 Main.panes = {}
 
 -- When TRP3 is installed we borrow its frame art by path at runtime -- nothing
--- of TRP3's is shipped in this addon. Checked when the window is first built,
--- by which point every addon has loaded, so .toc load order doesn't matter.
+-- of TRP3's is shipped in this addon.
+--
+-- Gated on the files being INSTALLED, not on TRP3 being loaded: textures are
+-- read straight off disk, so the art works on a character with TRP3 disabled.
+-- (Measured: an IsAddOnLoaded gate fell back to stock art on a client that had
+-- TRP3 in its AddOns folder.) The probe's SetTexture result is the final word.
 local TRP3_ART = "Interface\\AddOns\\totalRP3\\Resources\\UI\\"
 
-local function haveTRP3Art()
-    local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
-    return isLoaded and isLoaded("totalRP3") and true or false
+local function haveTRP3Art(f)
+    local info = (C_AddOns and C_AddOns.GetAddOnInfo) or GetAddOnInfo
+    if not info then return false end
+    local ok, name, _, _, _, reason = pcall(info, "totalRP3")
+    if not ok or not name or reason == "MISSING" then return false end
+    local probe = f:CreateTexture()
+    local found = probe:SetTexture(TRP3_ART .. "ui-category-button")
+    probe:Hide()
+    return found ~= false
 end
 
 -- A wooden strip along one edge. Vertical strips tile down, horizontal ones
@@ -79,7 +89,15 @@ local function woodStrip(f, vertical)
 end
 
 local function applyShellArt(f)
-    local trp3 = haveTRP3Art()
+    local trp3 = haveTRP3Art(f)
+    Main.trp3Art = trp3
+
+    -- Both background textures carry alpha, which let the world show through
+    -- the window. An opaque base underneath fixes that.
+    local base = f:CreateTexture(nil, "BACKGROUND", nil, -8)
+    base:SetPoint("TOPLEFT", 4, -4)
+    base:SetPoint("BOTTOMRIGHT", -4, 4)
+    base:SetColorTexture(0.11, 0.08, 0.06, 1)
 
     if f.SetBackdrop then
         f:SetBackdrop({
@@ -137,9 +155,71 @@ local function applyShellArt(f)
     end
 end
 
+-- TRP3's category button: a three-slice sheet (left edge, tiled centre,
+-- right edge), with a border layer on top and an additive highlight pair.
+-- Coordinates are TRP3's own, from UI/Sidebar/CategoryButton.xml/.lua.
+local SHEET = TRP3_ART .. "ui-category-button"
+local CATEGORY_STATES = {
+    NORMAL  = { { 0.5, 0.75, 0, 0.125 },     { 0.75, 1, 0, 0.125 },     { 0, 1, 0.375, 0.5 } },
+    PUSHED  = { { 0, 0.25, 0.25, 0.375 },    { 0.25, 0.5, 0.25, 0.375 }, { 0, 1, 0.5, 0.625 } },
+}
+
+local function threeSlice(button, layer, sub, alphaMode)
+    local l = button:CreateTexture(nil, layer, nil, sub)
+    l:SetTexture(SHEET); l:SetWidth(16)
+    l:SetPoint("TOPLEFT"); l:SetPoint("BOTTOMLEFT")
+    local r = button:CreateTexture(nil, layer, nil, sub)
+    r:SetTexture(SHEET); r:SetWidth(16)
+    r:SetPoint("TOPRIGHT"); r:SetPoint("BOTTOMRIGHT")
+    local c = button:CreateTexture(nil, layer, nil, sub)
+    c:SetTexture(SHEET, "REPEAT", nil); c:SetHorizTile(true)
+    c:SetPoint("TOPLEFT", l, "TOPRIGHT"); c:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
+    if alphaMode then
+        l:SetBlendMode(alphaMode); r:SetBlendMode(alphaMode); c:SetBlendMode(alphaMode)
+    end
+    return l, r, c
+end
+
+local function setSlice(l, r, c, coords)
+    l:SetTexCoord(unpack(coords[1]))
+    r:SetTexCoord(unpack(coords[2]))
+    c:SetTexCoord(unpack(coords[3]))
+end
+
+local function createCategoryButton(parent)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetSize(Main.SIDEBAR_WIDTH - 16, 32)
+
+    local l, r, c = threeSlice(button, "BACKGROUND", 0)
+    local bl, br, bc = threeSlice(button, "BORDER", 0)
+    setSlice(bl, br, bc, { { 0, 0.25, 0, 0.125 }, { 0.25, 0.5, 0, 0.125 }, { 0, 1, 0.125, 0.25 } })
+    local hl, hr, hc = threeSlice(button, "HIGHLIGHT", 0, "ADD")
+    setSlice(hl, hr, hc, CATEGORY_STATES.PUSHED)
+    local hbl, hbr, hbc = threeSlice(button, "HIGHLIGHT", 1, "ADD")
+    setSlice(hbl, hbr, hbc, { { 0, 0.25, 0.75, 0.875 }, { 0.25, 0.5, 0.75, 0.875 }, { 0, 1, 0.875, 1 } })
+
+    button.label = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    button.label:SetPoint("LEFT", 14, 0)
+    button.label:SetJustifyH("LEFT")
+
+    function button:SetText(text) self.label:SetText(text) end
+    -- Selected is drawn as TRP3's pushed state, held.
+    function button:SetSelected(on)
+        setSlice(l, r, c, on and CATEGORY_STATES.PUSHED or CATEGORY_STATES.NORMAL)
+        if on then
+            self.label:SetTextColor(1, 1, 1)
+        else
+            self.label:SetTextColor(1, 0.82, 0)
+        end
+    end
+    return button
+end
+
 -- A sidebar menu entry. Plain buttons rather than a template: the selected
 -- state is drawn here, so it looks the same on every client.
 local function createMenuButton(parent)
+    if Main.trp3Art then return createCategoryButton(parent) end
+
     local button = CreateFrame("Button", nil, parent)
     button:SetSize(Main.SIDEBAR_WIDTH - 20, 26)
 
@@ -220,7 +300,7 @@ function Main:GetFrame()
             button:SetText(pane.label)
             button:SetSelected(false)
             button:SetScript("OnClick", function() Main:Select(key) end)
-            y = y - 30
+            y = y - (self.trp3Art and 36 or 30)
             f.tabs[key] = button
         end
     end
