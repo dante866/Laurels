@@ -181,6 +181,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
             -- rival accept it by name instead of being told a uuid by hand.
             ns.Rival:BroadcastDef(t)
             ns.Rival:ForceBroadcast(t)
+            ns.Rival:WarnIfTiersShed(t)
         end
 
     elseif cmd == "toasts" then

@@ -289,5 +289,21 @@ check("emotes key apart",
 check("quest ids are in the key",
     KeyFor({ event = "quest", match = { ids = { 62 } } }) == "quest~i=62")
 
+
+-- Tier shedding: measured and reported, for published deeds with many tiers.
+local longDeed = { name = "Boar Annoyer", event = "kill", match = { nameContains = "Boar" },
+    tiers = {} }
+for i = 1, 15 do longDeed.tiers[i] = { count = i * 100, title = "A Long Title Here" } end
+local kept, total = A.ns.Rival:BroadcastTierFit(longDeed)
+check("tier fit reports the total", total == 15)
+check("tier fit reports fewer kept", kept < 15)
+local before = #A.messages
+A.ns.Rival:WarnIfTiersShed(longDeed)
+check("shedding is announced", #A.messages == before + 1
+    and A.messages[#A.messages]:find("Only the first") ~= nil)
+before = #A.messages
+A.ns.Rival:WarnIfTiersShed({ name = "x", event = "kill", match = {},
+    tiers = { { count = 1, title = "One" } } })
+check("a deed that fits says nothing", #A.messages == before)
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

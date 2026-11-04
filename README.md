@@ -220,6 +220,10 @@ Things to know:
   them into the client's emote token. A bare `/hug` uses your current target.
 - **Finding ids:** `/deed sources` prints the last thing each type saw this
   session, with its id — cast a spell, then run it to read the spell id.
+- **Tiers:** the form starts with 5 rows; **Add 1 more tier** goes up to 20.
+  A published deed travels in one addon message (255 bytes), so only the
+  tiers that fit reach rivals — about 7 with 16-character titles, 10 with
+  short ones. Publishing or saving such a deed says how many made it.
 
 Published deeds of the new types travel in the same `DEFPUB` layout as kill
 deeds (see `Rival/Comm.lua`), so a kill deed broadcasts exactly as it always

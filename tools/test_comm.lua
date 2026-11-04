@@ -180,5 +180,21 @@ local unknown = Comm:Decode(Comm.PROTO .. "|DEFPUB|U|G|t|X|haircut:bald||||||5|T
 check("an unknown kind decodes without its qualifier",
     unknown.def.event == "haircut" and next(unknown.def.match) == nil)
 
+-- --- tier shedding is reported ----------------------------------------------
+
+local many = {}
+for i = 1, 12 do many[i] = { count = i * 1000, title = "Sixteen Chars Ti" } end
+local shedMsg = { type = "DEFPUB", guid = "Player-4618-00D1568C", ver = "0.2.0",
+    def = { uuid = "D-6727a6c0-abcdef", name = "Boar Annoyer", event = "kill",
+            match = { nameContains = "Boar" }, tiers = many } }
+local shedBody, kept = Comm:EncodeDef(shedMsg)
+check("an over-long deed still fits", #shedBody <= Comm.MAX_BODY)
+check("the encoder reports how many tiers it kept", kept and kept > 0 and kept < 12)
+check("and the kept count matches what decodes",
+    #Comm:Decode(shedBody).def.tiers == kept)
+local _, allKept = Comm:EncodeDef({ type = "DEFPUB", guid = "G", ver = "t",
+    def = { uuid = "U", name = "N", event = "kill", match = {}, tiers = tiers } })
+check("a deed that fits keeps every tier", allKept == #tiers)
+
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

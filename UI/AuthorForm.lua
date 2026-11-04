@@ -8,7 +8,14 @@ local addonName, ns = ...
 local AuthorForm = {}
 ns.AuthorForm = AuthorForm
 
+-- Tier rows shown on a blank form, and the most "Add 1 more tier" will give.
+-- The cap is a form-usability choice, not a storage one: a deed can hold any
+-- number of tiers. What actually limits a PUBLISHED deed is the broadcast --
+-- one addon message carries the whole definition, and only the tiers that fit
+-- in it reach rivals (see Comm:EncodeDef).
 local TIER_ROWS = 5
+local MAX_TIERS = 20
+local TIER_ROW_HEIGHT = 28
 
 local function trim(s)
     return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
@@ -378,37 +385,40 @@ local function buildAuthorPane(f)
     f.zoneHint = zhint
 
     makeLabel(f, "Tiers  (count, then title)", 20, -224)
-    f.tierRows = {}
-    for i = 1, TIER_ROWS do
-        local y = -244 - (i - 1) * 28
-        local cnt = makeEdit(f, 70, true)
-        cnt:SetPoint("TOPLEFT", 30, y)
-        local ttl = makeEdit(f, 210)
-        ttl:SetPoint("TOPLEFT", 120, y)
-        f.tierRows[i] = { count = cnt, title = ttl }
-    end
 
-    -- Tab / Shift-Tab walk the fields in reading order, wrapping at the ends.
-    -- Dropdowns aren't edit boxes, so focus steps over them, and over any box
-    -- the current kind has hidden.
-    local order = { f.nameEdit, f.emoteEdit, f.matchEdit, f.npcEdit }
-    for _, r in ipairs(f.tierRows) do
-        table.insert(order, r.count)
-        table.insert(order, r.title)
-    end
-    local function step(from, dir)
-        local i = from
-        for _ = 1, #order do
-            i = (i - 1 + dir) % #order + 1
-            if order[i]:IsShown() then return order[i] end
-        end
-    end
-    for i, e in ipairs(order) do
-        e:SetScript("OnTabPressed", function()
-            local target = step(i, IsShiftKeyDown() and -1 or 1)
-            if target then target:SetFocus() end
+    -- The tier list scrolls, so "Add 1 more tier" can keep adding rows
+    -- without the form outgrowing the window. UIPanelScrollFrameTemplate has
+    -- been in every client since vanilla, but templates aren't in the API
+    -- dump, so a bare ScrollFrame driven by the mouse wheel is the fallback.
+    local ok, scroll = pcall(CreateFrame, "ScrollFrame", "DeedkeeperTierScroll", f,
+        "UIPanelScrollFrameTemplate")
+    if not (ok and scroll) then
+        scroll = CreateFrame("ScrollFrame", nil, f)
+        scroll:EnableMouseWheel(true)
+        scroll:SetScript("OnMouseWheel", function(self, delta)
+            local v = self:GetVerticalScroll() - delta * TIER_ROW_HEIGHT
+            self:SetVerticalScroll(math.max(0, math.min(v, self:GetVerticalScrollRange())))
         end)
     end
+    scroll:SetPoint("TOPLEFT", 0, -240)
+    scroll:SetPoint("BOTTOMRIGHT", -26, 34) -- room for the scroll bar and Save
+    local child = CreateFrame("Frame", nil, scroll)
+    child:SetSize(350, 1)
+    scroll:SetScrollChild(child)
+    f.tierScroll, f.tierChild = scroll, child
+    f.tierRows = {}
+
+    local add = CreateFrame("Button", nil, child, "UIPanelButtonTemplate")
+    add:SetSize(130, 22)
+    add:SetText("Add 1 more tier")
+    add:SetScript("OnClick", function()
+        AuthorForm:ShowTiers(AuthorForm.shownTiers + 1)
+        local row = f.tierRows[AuthorForm.shownTiers]
+        if row then row.count:SetFocus() end
+    end)
+    f.addTier = add
+
+    AuthorForm:ShowTiers(TIER_ROWS)
 
     local save = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     save:SetSize(110, 24)
@@ -428,6 +438,83 @@ local function buildAuthorPane(f)
     end)
 
     AuthorForm:SetKind("kill")
+end
+
+-- Tab / Shift-Tab walk the fields in reading order, wrapping at the ends.
+-- Dropdowns aren't edit boxes, so focus steps over them, and over any box
+-- hidden by the current kind or beyond the tiers shown. Rebuilt whenever a
+-- tier row is created, since the order has to include it.
+local function rebuildTabOrder(f)
+    local order = { f.nameEdit, f.emoteEdit, f.matchEdit, f.npcEdit }
+    for _, r in ipairs(f.tierRows) do
+        order[#order + 1] = r.count
+        order[#order + 1] = r.title
+    end
+    for i, e in ipairs(order) do
+        e:SetScript("OnTabPressed", function()
+            local dir = IsShiftKeyDown() and -1 or 1
+            local j = i
+            for _ = 1, #order do
+                j = (j - 1 + dir) % #order + 1
+                if order[j]:IsShown() then order[j]:SetFocus() return end
+            end
+        end)
+    end
+end
+
+-- Scroll the tier list just enough to show row i -- Tab into a row below
+-- the fold would otherwise type into a box you can't see.
+local function revealTier(f, i)
+    local scroll = f.tierScroll
+    scroll:UpdateScrollChildRect()
+    local top = (i - 1) * TIER_ROW_HEIGHT
+    local bottom = top + TIER_ROW_HEIGHT + 4
+    local view = scroll:GetHeight()
+    local cur = scroll:GetVerticalScroll()
+    if top < cur then
+        scroll:SetVerticalScroll(top)
+    elseif bottom > cur + view then
+        scroll:SetVerticalScroll(math.min(bottom - view, scroll:GetVerticalScrollRange()))
+    end
+end
+
+local function makeTierRow(f, i)
+    local y = -4 - (i - 1) * TIER_ROW_HEIGHT
+    local cnt = makeEdit(f.tierChild, 70, true)
+    cnt:SetPoint("TOPLEFT", 30, y)
+    local ttl = makeEdit(f.tierChild, 210)
+    ttl:SetPoint("TOPLEFT", 120, y)
+    for _, e in ipairs({ cnt, ttl }) do
+        e:HookScript("OnEditFocusGained", function() revealTier(f, i) end)
+    end
+    f.tierRows[i] = { count = cnt, title = ttl }
+end
+
+-- Show the first n tier rows (creating any that don't exist yet), hide the
+-- rest, and park "Add 1 more tier" under the last one shown.
+function AuthorForm:ShowTiers(n)
+    local f = self.frame
+    if not f then return end
+    -- Not capped here: editing a deed that already has more tiers than the
+    -- button would allow must show them all, or saving would drop the rest.
+    n = math.max(1, n)
+    local created = false
+    for i = #f.tierRows + 1, n do
+        makeTierRow(f, i)
+        created = true
+    end
+    if created then rebuildTabOrder(f) end
+
+    for i, r in ipairs(f.tierRows) do
+        r.count:SetShown(i <= n)
+        r.title:SetShown(i <= n)
+    end
+    self.shownTiers = n
+
+    f.addTier:ClearAllPoints()
+    f.addTier:SetPoint("TOPLEFT", 26, -4 - n * TIER_ROW_HEIGHT)
+    f.addTier:SetShown(n < MAX_TIERS)
+    f.tierChild:SetHeight(8 + n * TIER_ROW_HEIGHT + 26)
 end
 
 -- Back to a blank "New Deed", including the menu label, after a save or a
@@ -488,6 +575,8 @@ function AuthorForm:Clear()
         r.count:SetText("")
         r.title:SetText("")
     end
+    self:ShowTiers(TIER_ROWS)
+    f.tierScroll:SetVerticalScroll(0)
 end
 
 -- Fill the form from an existing deed so editing starts from what's there.
@@ -509,6 +598,7 @@ function AuthorForm:Load(t)
         UIDropDownMenu_SetText(f.zoneDrop, m.zone or ("map " .. tostring(m.zoneID)))
     end
 
+    self:ShowTiers(math.max(TIER_ROWS, t.tiers and #t.tiers or 0))
     for i, r in ipairs(f.tierRows) do
         local tier = t.tiers and t.tiers[i]
         if tier then
@@ -593,7 +683,8 @@ function AuthorForm:Save()
     end
 
     local tiers = {}
-    for _, r in ipairs(f.tierRows) do
+    for i = 1, self.shownTiers do
+        local r = f.tierRows[i]
         local c = tonumber(r.count:GetText())
         local tl = trim(r.title:GetText())
         if c and c > 0 and tl ~= "" then
@@ -618,6 +709,7 @@ function AuthorForm:Save()
             if t.published then
                 ns:Print("  |cffff8800It's published|r \226\128\148 rivals are "
                     .. "contesting the version they already have.")
+                ns.Rival:WarnIfTiersShed(t)
             end
         end
         self:Reset()

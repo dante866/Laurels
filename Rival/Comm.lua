@@ -185,7 +185,10 @@ end
 --
 -- Addon messages are capped at 255 bytes, and an over-long one fails to send
 -- with a result code we would misread as the channel refusing us. So the
--- encoder measures itself and sheds trailing tiers until it fits.
+-- encoder measures itself and sheds trailing tiers until it fits, and returns
+-- how many it kept as a second value -- shedding is otherwise invisible, and
+-- a rival who accepts gets only the tiers that made it. Measured: with
+-- 16-character titles about 7 tiers fit; 10-character, about 10.
 Comm.MAX_BODY = 240
 
 function Comm:EncodeDef(msg, tierLimit)
@@ -214,7 +217,7 @@ function Comm:EncodeDef(msg, tierLimit)
     if #body > self.MAX_BODY and limit > 1 then
         return self:EncodeDef(msg, limit - 1) -- shed a tier and remeasure
     end
-    return body
+    return body, limit
 end
 
 function Comm:Decode(body)

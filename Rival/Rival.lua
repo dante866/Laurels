@@ -233,13 +233,38 @@ function Rival:NearbyDeeds()
     return out
 end
 
-function Rival:BroadcastDef(tracker)
-    if not self:ShouldBroadcast(tracker) or not tracker.uuid then return end
-    ns.Comm:Send({ type = "DEFPUB", guid = self:MyGuid(), ver = ns.version,
+local function defMessage(self, tracker)
+    return { type = "DEFPUB", guid = self:MyGuid(), ver = ns.version,
         def = {
             uuid = tracker.uuid, name = tracker.name,
             event = tracker.event, match = tracker.match, tiers = tracker.tiers,
-        } })
+        } }
+end
+
+function Rival:BroadcastDef(tracker)
+    if not self:ShouldBroadcast(tracker) or not tracker.uuid then return end
+    ns.Comm:Send(defMessage(self, tracker))
+end
+
+-- How many of a deed's tiers fit in its broadcast, and how many it has. One
+-- addon message carries the whole definition, so rivals only ever receive
+-- the tiers that fit; the rest stay local to the author.
+function Rival:BroadcastTierFit(tracker)
+    local total = tracker.tiers and #tracker.tiers or 0
+    local msg = defMessage(self, tracker)
+    msg.def.uuid = msg.def.uuid or ns.genUUID() -- measure as if published
+    local _, kept = ns.Comm:EncodeDef(msg)
+    return kept or total, total
+end
+
+-- Say so when a published deed has more tiers than reach rivals.
+function Rival:WarnIfTiersShed(tracker)
+    local kept, total = self:BroadcastTierFit(tracker)
+    if kept < total then
+        ns:Print(("|cffff8800Only the first %d of %d tiers fit in a broadcast.|r "
+            .. "Rivals who accept get those %d; shorter titles fit more.")
+            :format(kept, total, kept))
+    end
 end
 
 -- Turn a heard definition into a real tracker. This is what "Accept" does,
