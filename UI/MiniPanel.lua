@@ -172,13 +172,33 @@ local function getRow(f, i)
     row.text:SetWidth(318)
     row.text:SetJustifyH("LEFT")
 
-    row.del = CreateFrame("Button", nil, row, "UIPanelCloseButton")
-    row.del:SetSize(22, 22)
-    row.del:SetPoint("TOPRIGHT", 4, 4)
+    -- Delete is the circle-and-slash "prohibited" sign, not a red X: the X
+    -- read as the window's close button, which sits just above it.
+    row.del = CreateFrame("Button", nil, row)
+    row.del:SetSize(18, 18)
+    row.del:SetPoint("TOPRIGHT", 0, 0)
+    local icon = row.del:CreateTexture(nil, "ARTWORK")
+    icon:SetAllPoints()
+    -- The equipment manager's "ignore this slot" icon. Textures aren't in the
+    -- Forever dump, so fall back to the vanilla loot Pass icon if it's absent.
+    local path = "Interface\\PaperDollInfoFrame\\UI-GearManager-LeaveItem-Opaque"
+    if icon:SetTexture(path) == false then
+        path = "Interface\\Buttons\\UI-GroupLoot-Pass-Up"
+        icon:SetTexture(path)
+    end
+    row.del:SetHighlightTexture(path, "ADD")
+    row.del:SetScript("OnMouseDown", function() icon:SetPoint("TOPLEFT", 1, -1) end)
+    row.del:SetScript("OnMouseUp", function() icon:SetAllPoints() end)
+    row.del:SetScript("OnEnter", function(b)
+        GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Delete deed", 1, 0.3, 0.3)
+        GameTooltip:Show()
+    end)
+    row.del:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     row.edit = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     row.edit:SetSize(38, 20)
-    row.edit:SetPoint("TOPRIGHT", -22, -1)
+    row.edit:SetPoint("TOPRIGHT", -24, 0)
     row.edit:SetText("Edit")
 
     f.rows[i] = row
