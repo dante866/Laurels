@@ -107,13 +107,24 @@ end
 
 -- --- progress -------------------------------------------------------------
 
-function Engine:ReportProgress(signal)
-    if not ns.db then return end
-    local amount = signal.amount or 1
+-- Every tracker a signal would advance, in list order. Counting goes through
+-- this, and so does the unit tooltip, which asks the same question before the
+-- kill -- so the tooltip can never promise a deed the kill won't count.
+function Engine:TrackersMatching(signal)
+    local out = {}
+    if not ns.db then return out end
     for _, t in ipairs(ns.db.trackers) do
         if t.event == signal.kind and matches(t.match, signal) then
-            self:Increment(t, amount)
+            table.insert(out, t)
         end
+    end
+    return out
+end
+
+function Engine:ReportProgress(signal)
+    local amount = signal.amount or 1
+    for _, t in ipairs(self:TrackersMatching(signal)) do
+        self:Increment(t, amount)
     end
 end
 

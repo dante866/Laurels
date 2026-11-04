@@ -325,6 +325,21 @@ local function buildAuthorPane(f)
         f.tierRows[i] = { count = cnt, title = ttl }
     end
 
+    -- Tab / Shift-Tab walk the fields in reading order, wrapping at the ends.
+    -- The zone dropdown isn't an edit box, so focus steps over it.
+    local order = { f.nameEdit, f.matchEdit, f.npcEdit }
+    for _, r in ipairs(f.tierRows) do
+        table.insert(order, r.count)
+        table.insert(order, r.title)
+    end
+    for i, e in ipairs(order) do
+        local nextBox = order[i % #order + 1]
+        local prevBox = order[(i - 2) % #order + 1]
+        e:SetScript("OnTabPressed", function()
+            if IsShiftKeyDown() then prevBox:SetFocus() else nextBox:SetFocus() end
+        end)
+    end
+
     local save = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     save:SetSize(110, 24)
     save:SetPoint("BOTTOMRIGHT", -4, 4)

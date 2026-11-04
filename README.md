@@ -251,6 +251,7 @@ UI/MiniPanel.lua         Deeds pane -- the tracker list
 UI/NearbyPanel.lua       Nearby pane -- challenges heard, with Accept
 UI/AuthorForm.lua        New Deed / Edit Deed pane
 UI/Toast.lua             steal banners (its own overlay, not a pane)
+UI/UnitTooltip.lua       "Deeds: ..." line on a mob's tooltip
 ```
 
 A **source** turns WoW events into normalized **signals**:

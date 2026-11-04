@@ -51,6 +51,20 @@ end
 -- work, and it is the half of this module most likely to differ per client.
 KillSource.ParseNpcID = getNpcID
 
+-- The signal killing this mob here would produce. Shared by the real kill and
+-- the unit tooltip, so both describe a mob identically.
+function KillSource.SignalFor(name, guid)
+    local zone, zoneID = getZone()
+    return {
+        kind   = "kill",
+        name   = name,
+        npcID  = getNpcID(guid),
+        zone   = zone,
+        zoneID = zoneID,
+        amount = 1,
+    }
+end
+
 function KillSource:Init(engine)
     self.engine = engine
     if self.frame then return end
@@ -99,13 +113,5 @@ function KillSource:OnCombatLog(event, ...)
     local petGUID = UnitGUID("pet")
     if sourceGUID ~= playerGUID and sourceGUID ~= petGUID then return end
 
-    local zone, zoneID = getZone()
-    self.engine:ReportProgress({
-        kind   = "kill",
-        name   = destName,
-        npcID  = getNpcID(destGUID),
-        zone   = zone,
-        zoneID = zoneID,
-        amount = 1,
-    })
+    self.engine:ReportProgress(KillSource.SignalFor(destName, destGUID))
 end

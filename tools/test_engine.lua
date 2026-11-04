@@ -164,5 +164,36 @@ check("new tracker got an id", type(def.id) == "string" and #def.id > 0)
 Engine:DeleteTracker(def.id)
 check("DeleteTracker removed it", Engine:GetTracker(def.id) == nil)
 
+-- TrackersMatching: the question the unit tooltip asks before a kill.
+local hit = Engine:TrackersMatching({ kind = "kill", name = "Kobold Miner" })
+check("TrackersMatching finds the kobold deed", #hit == 1 and hit[1].id == "kobolds")
+check("TrackersMatching finds nothing for a boar",
+    #Engine:TrackersMatching({ kind = "kill", name = "Mottled Boar" }) == 0)
+check("TrackersMatching matches by npcID",
+    #Engine:TrackersMatching({ kind = "kill", name = "Onyxia", npcID = 11502 }) == 1)
+
+local scoped = Engine:CreateTracker({ name = "Elwynn Kobolds", event = "kill",
+    match = { nameContains = "Kobold", zone = "Elwynn Forest" },
+    tiers = { { count = 5, title = "Local Hero" } } })
+check("zone-scoped deed shows in its zone", #Engine:TrackersMatching(
+    { kind = "kill", name = "Kobold Miner", zone = "Elwynn Forest" }) == 2)
+check("zone-scoped deed hidden elsewhere", #Engine:TrackersMatching(
+    { kind = "kill", name = "Kobold Miner", zone = "Westfall" }) == 1)
+Engine:DeleteTracker(scoped.id)
+
+-- UnitTooltip.Line: "deed 1, deed 2, +x more".
+assert(loadfile("UI/UnitTooltip.lua"))("Deedkeeper", ns)
+local Line = ns.UnitTooltip.Line
+local function deeds(n)
+    local t = {}
+    for i = 1, n do t[i] = { name = "D" .. i } end
+    return t
+end
+check("tooltip line: none is nil", Line(deeds(0)) == nil)
+check("tooltip line: one", Line(deeds(1)) == "D1")
+check("tooltip line: two", Line(deeds(2)) == "D1, D2")
+check("tooltip line: three collapses", Line(deeds(3)) == "D1, D2, +1 more")
+check("tooltip line: five collapses", Line(deeds(5)) == "D1, D2, +3 more")
+
 print(("\n%d passed, %d failed"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)
