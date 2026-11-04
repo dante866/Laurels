@@ -234,7 +234,7 @@ for it, so it never counts there.
 
 1. You: `/deed publish boarsmustdie`
 2. Them: the **Nearby** tab in `/deed` (or `/deed nearby`) → your deed is
-   listed by name, with its tiers in the tooltip → **Accept**
+   listed by name → **Preview** shows all of it → **Accept** or **Decline**
 3. Both kill things, within `YELL` range of each other
 
 Accepting builds the deed from **your** definition — the same match rules and
@@ -244,6 +244,15 @@ Nobody types a challenge id.
 Definitions travel on publish and whenever a client says hello, so someone
 logging in later picks up what's already out there; **Ask Again** re-requests
 on demand.
+
+**Only the author can change a deed, and only with your OK.** An offer is
+tied to whoever first broadcast it, by the sender name Blizzard's server
+attaches to each addon message, which another addon can't fake. A message
+reusing that challenge id from anyone else is ignored. Once you've accepted a
+deed, the author's later edits arrive in Nearby as an **Update** to preview:
+**Accept Update** applies it (your progress is kept), **Keep Mine** turns that
+version down. **Decline** hides an offer for good; `/deed undecline` brings
+declined offers back.
 
 `/deed adopt <yourDeedId> <challengeId>` still exists for pasting an id
 directly, but **Nearby** is the easy path.

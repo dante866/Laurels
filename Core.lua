@@ -239,6 +239,12 @@ SlashCmdList.DEEDKEEPER = function(msg)
     elseif cmd == "nearby" then
         if ns.Nearby then ns.Nearby:Toggle() end
 
+    elseif cmd == "undecline" then
+        local n = ns.Rival:ClearDeclined()
+        ns:Print(("Forgot %d declined deed%s; they'll be offered again when "
+            .. "next broadcast; Ask Again in Nearby asks for them now.")
+            :format(n, n == 1 and "" or "s"))
+
     elseif cmd == "adopt" then
         -- Accept someone else's challenge: point one of your deeds at their
         -- challenge id so both clients compute the same ladder key.
@@ -431,6 +437,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed reset <id>      reset a tracker's progress")
         ns:Print("  /deed publish <id>    publish a deed so others can contest it")
         ns:Print("  /deed nearby          browse challenges published nearby")
+        ns:Print("  /deed undecline       offer every declined challenge again")
         ns:Print("  /deed adopt <id> <challengeId>")
         ns:Print("                        accept a challenge by id (/deed nearby is easier)")
         ns:Print("  /deed unpublish <id>  stop broadcasting a deed")

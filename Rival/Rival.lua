@@ -219,6 +219,49 @@ function Rival:AdoptedUUID(uuid)
     end
 end
 
+-- Challenge ids the player has turned down. A declined deed is ignored when
+-- it's broadcast again, or it would reappear on the author's next resend.
+function Rival:Declined()
+    ns.db.declined = ns.db.declined or {}
+    return ns.db.declined
+end
+
+-- Newer versions of deeds we've accepted, waiting on the player's OK. An
+-- accepted deed never changes underneath you: the author's edits arrive
+-- here, and only Accept Update applies them.
+function Rival:Updates()
+    ns.db.updates = ns.db.updates or {}
+    return ns.db.updates
+end
+
+-- Who published a deed: the sender name Blizzard's server attaches to the
+-- addon message. That can't be forged, unlike the GUID inside the payload,
+-- which the sending addon writes itself. Deeds stored before `author`
+-- existed carry the same value as `origin`, which DEFPUB has always set from
+-- the sender.
+local function authorOf(d)
+    return d and (d.author or d.origin)
+end
+
+-- The author of a tracker we accepted, or nil for one we made ourselves
+-- (ours are published with our own name as origin, and take no updates).
+function Rival:TrackerAuthor(t)
+    if t.author then return t.author end
+    if t.origin and t.origin ~= self:MyName() and t.origin ~= "adopted" then
+        return t.origin
+    end
+end
+
+-- Two versions of a deed are the same if they encode the same. Reusing the
+-- wire encoding means "same" is exactly "a rival would receive the same".
+local function signature(d)
+    local body = ns.Comm:EncodeDef({ guid = "", ver = "", def = {
+        uuid = "", name = d.name, event = d.event,
+        match = d.match, tiers = d.tiers } })
+    return body
+end
+Rival.Signature = signature
+
 -- Offers worth showing: everything heard that we aren't already contesting.
 function Rival:NearbyDeeds()
     local out = {}
@@ -283,7 +326,9 @@ function Rival:Adopt(uuid)
         match = copy(d.match or {}),
         tiers = copy(d.tiers or {}),
         uuid = uuid, published = true, origin = d.origin,
+        author = authorOf(d), authorGuid = d.authorGuid,
     })
+    self:Updates()[uuid] = nil
     self:RecordOwnClaim(t)
     self:ForceBroadcast(t)
     return t
@@ -343,17 +388,126 @@ end
 
 -- Handlers -----------------------------------------------------------------
 
+-- A heard definition. Only its author may ever change what we hold for a
+-- challenge id: the first sender we hear for an id owns it, and a message
+-- for that id from anyone else is dropped. Ids are random and only learned
+-- from the author's own broadcast, so nobody can claim one first.
 function Rival:OnDefPub(msg)
     local d = msg.def
     if not d or not d.uuid then return end
-    -- Our own published deeds come back to us on a shared channel; they are
-    -- not offers. AdoptedUUID covers that and the already-accepted case alike.
-    if self:AdoptedUUID(d.uuid) then return end
-
+    d.author = msg.sender
+    d.authorGuid = msg.guid
     d.origin = msg.name or msg.sender
     d.seen = self:Now()
+
+    local tracker = self:AdoptedUUID(d.uuid)
+    if tracker then
+        -- One we made (our own echo) or one we've accepted. Ours takes no
+        -- updates; an accepted one only from its author, and never directly.
+        local author = self:TrackerAuthor(tracker)
+        if not author or author ~= d.author then return end
+        local sig = signature(d)
+        if sig == signature(tracker) or sig == tracker.ignoredUpdate then
+            self:Updates()[d.uuid] = nil -- nothing new, or already turned down
+        else
+            self:Updates()[d.uuid] = d
+        end
+        if ns.UI and ns.UI.RefreshNearby then ns.UI:RefreshNearby() end
+        return
+    end
+
+    if self:Declined()[d.uuid] then return end
+    local known = self:KnownDeeds()[d.uuid]
+    local author = authorOf(known)
+    if author and author ~= d.author then return end -- not theirs to change
+
     self:KnownDeeds()[d.uuid] = d
     if ns.UI and ns.UI.RefreshNearby then ns.UI:RefreshNearby() end
+end
+
+-- Turn an offer down. It leaves Nearby and stays gone when rebroadcast.
+function Rival:Decline(uuid)
+    local d = self:KnownDeeds()[uuid]
+    if not d then return nil, "no such deed heard nearby" end
+    self:Declined()[uuid] = { name = d.name, author = authorOf(d), at = self:Now() }
+    self:KnownDeeds()[uuid] = nil
+    return true
+end
+
+-- Forget every decline, so those deeds can be offered again.
+function Rival:ClearDeclined()
+    local n = 0
+    for uuid in pairs(self:Declined()) do
+        self:Declined()[uuid] = nil
+        n = n + 1
+    end
+    return n
+end
+
+-- Pending updates to accepted deeds, as { deed = newVersion, tracker = ours }.
+function Rival:PendingUpdates()
+    local out = {}
+    for uuid, d in pairs(self:Updates()) do
+        local t = self:AdoptedUUID(uuid)
+        if t then
+            out[#out + 1] = { deed = d, tracker = t }
+        else
+            self:Updates()[uuid] = nil -- we stopped contesting it
+        end
+    end
+    table.sort(out, function(a, b) return (a.deed.name or "") < (b.deed.name or "") end)
+    return out
+end
+
+-- Apply the author's newer version. Progress is kept, as with any edit.
+function Rival:AcceptUpdate(uuid)
+    local d = self:Updates()[uuid]
+    local t = self:AdoptedUUID(uuid)
+    if not (d and t) then return nil, "no update waiting for that deed" end
+    ns.Engine:UpdateTracker(t.id, { name = d.name, event = d.event,
+        match = copy(d.match or {}), tiers = copy(d.tiers or {}) })
+    t.ignoredUpdate = nil
+    self:Updates()[uuid] = nil
+    return t
+end
+
+-- Keep our version. This exact update won't be offered again; a later,
+-- different one will.
+function Rival:IgnoreUpdate(uuid)
+    local d = self:Updates()[uuid]
+    local t = self:AdoptedUUID(uuid)
+    if not (d and t) then return nil, "no update waiting for that deed" end
+    t.ignoredUpdate = signature(d)
+    self:Updates()[uuid] = nil
+    return true
+end
+
+-- What an update would change, one line per difference, for the preview.
+-- Text is raw (from the wire); the caller escapes it for display.
+function Rival:DescribeChanges(t, d)
+    local lines = {}
+    if (t.name or "") ~= (d.name or "") then
+        lines[#lines + 1] = ('Name: "%s" becomes "%s"'):format(t.name or "", d.name or "")
+    end
+    local was = ns.Kinds.Describe(t.event, t.match)
+    local now = ns.Kinds.Describe(d.event, d.match)
+    if was ~= now then
+        lines[#lines + 1] = "Counts: " .. was
+        lines[#lines + 1] = "  becomes: " .. now
+    end
+    local old, new = t.tiers or {}, d.tiers or {}
+    for i = 1, math.max(#old, #new) do
+        local a, b = old[i], new[i]
+        local function show(x) return ("%s at %d"):format(x.title or "?", x.count or 0) end
+        if a and not b then
+            lines[#lines + 1] = ("Tier %d removed: %s"):format(i, show(a))
+        elseif b and not a then
+            lines[#lines + 1] = ("Tier %d added: %s"):format(i, show(b))
+        elseif a.title ~= b.title or a.count ~= b.count then
+            lines[#lines + 1] = ("Tier %d: %s becomes %s"):format(i, show(a), show(b))
+        end
+    end
+    return lines
 end
 
 function Rival:OnClaim(msg)

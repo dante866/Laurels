@@ -297,7 +297,8 @@ end
 function UI:RefreshNearby()
     if ns.Nearby then ns.Nearby:Refresh() end
     if not ns.MainFrame:IsShown() then return end
-    local pending = ns.Rival and #ns.Rival:NearbyDeeds() or 0
+    local pending = ns.Rival
+        and (#ns.Rival:NearbyDeeds() + #ns.Rival:PendingUpdates()) or 0
     ns.MainFrame:SetTabLabel("nearby",
         pending > 0 and ("Nearby (%d)"):format(pending) or "Nearby")
 end

@@ -305,5 +305,92 @@ before = #A.messages
 A.ns.Rival:WarnIfTiersShed({ name = "x", event = "kill", match = {},
     tiers = { { count = 1, title = "One" } } })
 check("a deed that fits says nothing", #A.messages == before)
+
+-- 11. Only a deed's author can change it, and nothing changes without a click.
+local Pub  = makeClient("Publisher")
+local Rec  = makeClient("Receiver")
+local Mal  = makeClient("Mallory")
+Rec.ns.db.trackers = {}
+Mal.ns.db.trackers = {}
+local LONG = "DEED-LONG"
+local pubDeed = Pub.ns.db.trackers[1]
+pubDeed.uuid = LONG
+pubDeed.name = "Epic Boar Saga"
+pubDeed.origin = "Publisher"
+pubDeed.tiers = { { count = 10, title = "Boar Botherer" }, { count = 50, title = "Boar Bane" },
+                  { count = 100, title = "Boar Legend" } }
+connect({ Pub, Rec, Mal })
+
+Pub.ns.Rival:BroadcastDef(pubDeed)
+local heard = Rec.ns.Rival:KnownDeeds()[LONG]
+check("receiver heard the epic deed", heard and #heard.tiers == 3)
+check("bound to the server-supplied sender", heard and heard.author == "Publisher Resthaerl")
+
+-- Mallory reuses the id, even copying the author's GUID into the payload.
+local function forge(name, tiers)
+    Mal.ns.Comm:Send({ type = "DEFPUB", guid = Pub.guid, ver = "t", def = {
+        uuid = LONG, name = name, event = "kill", match = {}, tiers = tiers } })
+end
+forge("lol", { { count = 1, title = "gibberish" } })
+heard = Rec.ns.Rival:KnownDeeds()[LONG]
+check("a forged replacement is ignored", heard and heard.name == "Epic Boar Saga"
+    and #heard.tiers == 3)
+
+-- The real author can still refresh their own offer.
+pubDeed.tiers[3].title = "Boar Myth"
+Pub.ns.Rival:BroadcastDef(pubDeed)
+check("the author can update an unaccepted offer",
+    Rec.ns.Rival:KnownDeeds()[LONG].tiers[3].title == "Boar Myth")
+
+-- Decline: gone, and stays gone when rebroadcast, until undeclined.
+check("decline succeeds", Rec.ns.Rival:Decline(LONG) == true)
+check("a declined deed leaves Nearby", #Rec.ns.Rival:NearbyDeeds() == 0)
+Pub.ns.Rival:BroadcastDef(pubDeed)
+check("and doesn't return on rebroadcast", #Rec.ns.Rival:NearbyDeeds() == 0)
+check("undecline forgets it", Rec.ns.Rival:ClearDeclined() == 1)
+Pub.ns.Rival:BroadcastDef(pubDeed)
+check("and it's offered again", #Rec.ns.Rival:NearbyDeeds() == 1)
+
+-- Accept, then the author edits: our copy is untouched, an update waits.
+local mine = Rec.ns.Rival:Adopt(LONG)
+check("accepted copy remembers its author", mine and mine.author == "Publisher Resthaerl")
+farm(Rec, "Kobold", 7)
+forge("lol", { { count = 1, title = "gibberish" } })
+check("a forged update is ignored", #Rec.ns.Rival:PendingUpdates() == 0)
+Pub.ns.Rival:BroadcastDef(pubDeed)
+check("an unchanged rebroadcast is no update", #Rec.ns.Rival:PendingUpdates() == 0)
+
+pubDeed.name = "Epic Boar Saga II"
+pubDeed.tiers[4] = { count = 500, title = "Boar God" }
+Pub.ns.Rival:BroadcastDef(pubDeed)
+check("an accepted deed isn't changed by the author's edit",
+    mine.name == "Epic Boar Saga" and #mine.tiers == 3)
+local ups = Rec.ns.Rival:PendingUpdates()
+check("the edit waits as an update", #ups == 1 and ups[1].deed.name == "Epic Boar Saga II")
+local changes = Rec.ns.Rival:DescribeChanges(mine, ups[1].deed)
+local joined = table.concat(changes, "\n")
+check("the preview names the rename", joined:find("becomes \"Epic Boar Saga II\"", 1, true) ~= nil)
+check("and the added tier", joined:find("Tier 4 added: Boar God at 500", 1, true) ~= nil)
+
+-- Keep Mine: this version won't be offered again, a different one will.
+check("keep mine succeeds", Rec.ns.Rival:IgnoreUpdate(LONG) == true)
+Pub.ns.Rival:BroadcastDef(pubDeed)
+check("the kept-against version isn't re-offered", #Rec.ns.Rival:PendingUpdates() == 0)
+pubDeed.tiers[4].count = 400
+Pub.ns.Rival:BroadcastDef(pubDeed)
+check("a newer version is offered", #Rec.ns.Rival:PendingUpdates() == 1)
+
+-- Accept Update: the author's version, progress kept.
+local before = Rec.ns.Engine:GetProgress(mine.id)
+local updated = Rec.ns.Rival:AcceptUpdate(LONG)
+check("accepting the update applies it", updated and updated.name == "Epic Boar Saga II"
+    and #updated.tiers == 4 and updated.tiers[4].count == 400)
+check("and keeps progress", Rec.ns.Engine:GetProgress(mine.id) == before)
+check("and clears the update", #Rec.ns.Rival:PendingUpdates() == 0)
+Pub.ns.Rival:BroadcastDef(pubDeed)
+check("now in step with the author", #Rec.ns.Rival:PendingUpdates() == 0)
+
+-- The author never gets an update offered for their own deed.
+check("no update for your own deed", #Pub.ns.Rival:PendingUpdates() == 0)
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)
