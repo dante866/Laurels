@@ -26,8 +26,11 @@ two coexist.
 present — `C_ChatInfo`, `C_Timer` and `C_Map` are all measured as available,
 and the pre-Legion globals `SendAddonMessage` / `RegisterAddonMessagePrefix`
 are measured as *absent* — but plenty of retail-only functions are missing.
-`CombatLogGetCurrentEventInfo` is one of them, and assuming it cost us a
-silently dead kill tracker on Forever.
+`CombatLogGetCurrentEventInfo` is one of them. And on Forever the engine's
+addon restrictions are on: **the combat log is closed to addons**, so kills,
+melee swings and deaths use `PARTY_KILL`, `PLAYER_SWING` and the death recap
+there (`## X-CombatLog: closed` in `Laurels.toc`). A name being in the dump
+doesn't mean addons may use it.
 
 **Before using any WoW API, check the Forever dump** rather than assuming:
 `docs/api.json` in [Atraeau/WoW-Addons](https://github.com/Atraeau/WoW-Addons).
@@ -50,7 +53,8 @@ regardless while you correct the number.
 **v1 — tracking engine**
 - [x] Tracker definitions with ascending title **tiers**
 - [x] Pluggable **sources** feeding normalized "signals" into the engine
-- [x] **KillSource** — counts killing blows via the combat log (name / npcID match)
+- [x] **KillSource** — counts killing blows (name / npcID match), via the combat
+  log on MoP Classic and `PARTY_KILL` on Forever
 - [x] **Thirteen more deed types** — melee swings, player kills, boss kills,
   quests, deaths, duels, emotes, spell casts, loot, loot rolls, fishing,
   flights, and titles held (see [Deed types](#deed-types))
@@ -353,10 +357,10 @@ Tracking/Kinds.lua       every deed type: labels, filters, descriptions
 Tracking/Signals.lua     shared signal helpers: zone, NPC id from GUID, combat log
 Tracking/Engine.lua      owns trackers; matches signals -> increments -> tiers
 Tracking/Sources/
-  KillSource.lua         combat log -> { kind="kill", name, npcID }
-  SwingSource.lua        combat log SWING_DAMAGE -> { kind="swing", weapon, name, id }
+  KillSource.lua         combat log / PARTY_KILL -> { kind="kill", name, npcID }
+  SwingSource.lua        SWING_DAMAGE / PLAYER_SWING -> { kind="swing", weapon, name, id }
   QuestSource.lua        QUEST_TURNED_IN -> { kind="quest", id, name }
-  DeathSource.lua        PLAYER_DEAD + last hit -> { kind="death", cause, name, id }
+  DeathSource.lua        PLAYER_DEAD + last hit / recap -> { kind="death", cause, name, id }
   EmoteSource.lua        DoEmote/PerformEmote hooks -> { kind="emote", emote, name, id }
   SpellSource.lua        UNIT_SPELLCAST_SUCCEEDED -> { kind="spell", id, name }
   FishSource.lua         fishing loot window -> { kind="fish", names }
