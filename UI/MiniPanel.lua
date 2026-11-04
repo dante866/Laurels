@@ -205,6 +205,27 @@ local function getRow(f, i)
     return row
 end
 
+-- Deleting throws away the count and the deed's place on the rival ladder,
+-- and there's no undo, so it asks first. Blizzard's own confirm dialog, the
+-- same one used for destroying items. The id rides in the popup's data rather
+-- than an upvalue, so a second click on another row can't confirm the wrong
+-- deed.
+StaticPopupDialogs["DEEDKEEPER_DELETE_DEED"] = {
+    text = "Delete the deed \"%s\"?\n\nIts count and titles will be lost.",
+    button1 = YES or "Yes",
+    button2 = NO or "No",
+    OnAccept = function(_, id) ns.Engine:DeleteTracker(id) end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    showAlert = true,
+    preferredIndex = 3, -- dodges the taint other addons cause in slots 1-2
+}
+
+function UI:ConfirmDelete(id, name)
+    StaticPopup_Show("DEEDKEEPER_DELETE_DEED", name or id, nil, id)
+end
+
 function UI:Refresh()
     if not self.frame or not self.frame:IsShown() then return end
     local f = self.frame
@@ -220,7 +241,8 @@ function UI:Refresh()
 
         local id = t.id
         row.trackerId = id
-        row.del:SetScript("OnClick", function() ns.Engine:DeleteTracker(id) end)
+        local name = t.name
+        row.del:SetScript("OnClick", function() UI:ConfirmDelete(id, name) end)
         row.edit:SetScript("OnClick", function()
             if ns.AuthorForm then ns.AuthorForm:Open(id) end
         end)
