@@ -137,6 +137,25 @@ local function collectZones()
     return zoneListFrom(root)
 end
 
+-- Built when the dropdown opens, not when the form does: the form is reached
+-- from the sidebar as well as from Open(), and only Open() used to build it,
+-- which left the sidebar route with nothing but "Any zone". Built once and
+-- kept, since the map tree doesn't change mid-session; an empty result (map
+-- data not loaded yet) is retried on the next open.
+local function loadZones(f)
+    if f.zoneTree and (#f.zoneTree > 0 or f.zoneFallback) then return end
+    f.zoneTree = collectZoneTree()
+    -- Flat list only as a fallback, so a client reporting no continents still
+    -- gets a browsable list instead of nothing.
+    f.zoneFallback = nil
+    if #f.zoneTree == 0 then
+        local flat = collectZones()
+        if #flat > 0 then
+            f.zoneFallback = { zones = flat, chunks = chunkZones(flat) }
+        end
+    end
+end
+
 local function parseNpcIDs(str)
     str = trim(str)
     if str == "" then return nil end
@@ -206,6 +225,7 @@ local function buildAuthorPane(f)
         level = level or 1
 
         if level == 1 then
+            loadZones(f)
             local info = UIDropDownMenu_CreateInfo()
             info.text = ANY_ZONE
             info.notCheckable = true
@@ -374,19 +394,6 @@ end
 -- Open blank to author a deed, or pass an id to edit that one in place.
 function AuthorForm:Open(trackerId)
     local f = self:GetFrame()
-    -- Rebuilt per open: the zone list needs a loaded map tree, which isn't
-    -- guaranteed at addon load, and "Current zone" should follow the player.
-    f.zoneTree = collectZoneTree()
-    -- Flat list only as a fallback, so a client reporting no continents still
-    -- gets a browsable list instead of nothing.
-    f.zoneFallback = nil
-    if #f.zoneTree == 0 then
-        local flat = collectZones()
-        if #flat > 0 then
-            f.zoneFallback = { zones = flat, chunks = chunkZones(flat) }
-        end
-    end
-
     self:Clear()
 
     local existing = trackerId and ns.Engine:GetTracker(trackerId)
