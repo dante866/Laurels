@@ -22,6 +22,12 @@ local ROWS = 6
 
 local function esc(s) return ns.Comm.Escape(s) end
 
+-- A deed author as shown: their TRP3 name when known (Integrations/TRP3),
+-- else the name their broadcast came from.
+local function author(d)
+    return (ns.Names and ns.Names.ForDeed(d)) or d.origin
+end
+
 local function describe(d)
     return ns.Kinds.Describe(d.event, d.match)
 end
@@ -37,8 +43,8 @@ local function showTooltip(row)
     local d = item.deed
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:AddLine(esc(d.name) or "?", 1, 1, 1)
-    if d.origin then
-        GameTooltip:AddLine(("published by %s"):format(esc(d.origin)), 0.6, 0.6, 0.6)
+    if author(d) then
+        GameTooltip:AddLine(("published by %s"):format(esc(author(d))), 0.6, 0.6, 0.6)
     end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine(("Counts: %s"):format(esc(describe(d))), 0.9, 0.9, 0.9)
@@ -213,7 +219,7 @@ function Nearby:ShowDetail(item)
     if item.kind == "update" then
         v.title:SetText("Update: " .. (esc(d.name) or "?"))
         v.byline:SetText(("from %s, for a deed you've accepted"):format(
-            esc(d.origin) or "its author"))
+            esc(author(d)) or "its author"))
         lines[#lines + 1] = "|cffffd100What changes|r"
         for _, l in ipairs(ns.Rival:DescribeChanges(item.tracker, d)) do
             lines[#lines + 1] = "  " .. esc(l)
@@ -239,7 +245,7 @@ function Nearby:ShowDetail(item)
         end)
     else
         v.title:SetText(esc(d.name) or "?")
-        v.byline:SetText(("published by %s"):format(esc(d.origin) or "someone"))
+        v.byline:SetText(("published by %s"):format(esc(author(d)) or "someone"))
         lines[#lines + 1] = "|cffffd100Counts|r  " .. esc(describe(d))
         lines[#lines + 1] = " "
         lines[#lines + 1] = "|cffffd100Tiers|r"
@@ -330,7 +336,7 @@ function Nearby:Refresh()
             if item.kind == "update" then
                 local n = #ns.Rival:DescribeChanges(item.tracker, d)
                 row.text:SetText(("|cffffd100Update:|r %s\n|cff999999   by %s \226\128\148 %d change%s|r")
-                    :format(esc(d.name) or "?", esc(d.origin) or "its author",
+                    :format(esc(d.name) or "?", esc(author(d)) or "its author",
                         n, n == 1 and "" or "s"))
             else
                 -- Deed name and author arrive over the wire as free text.
@@ -340,7 +346,7 @@ function Nearby:Refresh()
                         :format(arrival.received, arrival.total)
                     or ""
                 row.text:SetText(("%s\n|cff999999   by %s \226\128\148 %d tier%s|r%s"):format(
-                    esc(d.name) or "?", esc(d.origin) or "someone",
+                    esc(d.name) or "?", esc(author(d)) or "someone",
                     tiers, tiers == 1 and "" or "s", status))
             end
             local uuid = item.uuid

@@ -5,6 +5,7 @@
 ## Version: 0.2.0
 ## SavedVariables: LaurelsDB
 ## SavedVariablesPerCharacter: LaurelsCharDB
+## OptionalDeps: totalRP3
 
 # Measured: this client carries SAY/YELL and refuses a custom CHANNEL, the
 # exact inverse of WoW-Forever. YELL is therefore the right default here, and
@@ -42,6 +43,7 @@ Tracking\Sources\FishSource.lua
 Rival\Ladder.lua
 Rival\Comm.lua
 Rival\Rival.lua
+Integrations\TRP3.lua
 UI\MainFrame.lua
 UI\MiniPanel.lua
 UI\AuthorForm.lua

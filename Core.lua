@@ -186,6 +186,14 @@ SlashCmdList.LAURELS = function(msg)
             ns.Rival:ForceBroadcast(t)
         end
 
+    elseif cmd == "rpnames" then
+        local on = ns.Names.Toggle()
+        ns:Print(on and "Showing players by their TRP3 names where TRP3 knows them."
+            or "Showing players by their game names.")
+        if on and not ns.Names.Enabled() then
+            ns:Print("  TRP3 isn't loaded, so game names are shown for now.")
+        end
+
     elseif cmd == "minimap" then
         local shown = ns.MinimapButton:Toggle()
         ns:Print(shown and "Minimap button shown."
@@ -353,7 +361,7 @@ SlashCmdList.LAURELS = function(msg)
                     -- so resolve it against this deed's tiers.
                     local title = ns.Rival:TitleFor(t, e.tier)
                     ns:Print(("  %d. %s \226\128\148 %d  %s%s%s"):format(
-                        i, ns.Comm.Escape(e.name), e.count,
+                        i, ns.Comm.Escape(ns.Rival.DisplayName(e)), e.count,
                         title and ("|cffffd100<" .. ns.Comm.Escape(title) .. ">|r")
                                or "|cff999999(no title yet)|r",
                         (i == 1) and "  (holder)" or "",
@@ -443,6 +451,7 @@ SlashCmdList.LAURELS = function(msg)
         ns:Print("  /deed simoffer [update|forge|long|stall|clear]")
         ns:Print("                        fake a published deed, to test Nearby solo")
         ns:Print("  /deed minimap         hide or show the minimap button")
+        ns:Print("  /deed rpnames         show rivals by TRP3 name (on) or game name")
         ns:Print("  /deed toasts [on|off|quiet|test]")
         ns:Print("                        steal pop-ups: show, mute or preview")
         ns:Print("  /deed channel [type]  show or set the broadcast channel")

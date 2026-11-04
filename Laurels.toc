@@ -5,6 +5,7 @@
 ## Version: 0.2.0
 ## SavedVariables: LaurelsDB
 ## SavedVariablesPerCharacter: LaurelsCharDB
+## OptionalDeps: totalRP3
 
 # Measured: this client refuses SAY/YELL and carries a custom CHANNEL, so the
 # ladder here is server-wide rather than proximity-based. /deed channel
@@ -34,6 +35,7 @@ Tracking\Sources\FishSource.lua
 Rival\Ladder.lua
 Rival\Comm.lua
 Rival\Rival.lua
+Integrations\TRP3.lua
 UI\MainFrame.lua
 UI\MiniPanel.lua
 UI\AuthorForm.lua

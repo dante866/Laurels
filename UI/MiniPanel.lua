@@ -95,7 +95,7 @@ local function showRowTooltip(row)
                 local mine = (e.guid == myGuid)
                 GameTooltip:AddLine(
                     ("  %d. %s \226\128\148 %d%s"):format(
-                        i, safe(e.name) or "?", e.count or 0, mine and "  (you)" or ""),
+                        i, safe(ns.Rival.DisplayName(e)) or "?", e.count or 0, mine and "  (you)" or ""),
                     mine and 0.2 or 0.8, mine and 1 or 0.8, mine and 0.2 or 0.8)
             end
             if #board > 5 then
@@ -139,7 +139,7 @@ local function standingsLine(t)
     -- GetRank returns nil when we have no claim on this deed yet. Say how
     -- many rivals there are rather than inventing a rank for ourselves.
     -- The holder's name came from another client; escape before display.
-    local who = ns.Comm.Escape(holder.name) or "someone"
+    local who = ns.Comm.Escape(ns.Rival.DisplayName(holder)) or "someone"
     if not rank then
         return ("|cffff8800   %s holds it|r|cff999999  %d   (%d on the ladder)|r")
             :format(who, holder.count or 0, total)

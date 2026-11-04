@@ -110,6 +110,15 @@ local function titleFor(tracker, tierIndex)
     return Rival:TitleFor(tracker, tierIndex)
 end
 
+-- How to show a ladder entry's player: their TRP3 name when the integration
+-- is loaded and knows them, else the name their claim carried. Guarded so
+-- the headless suites, which don't load Integrations/, still run this path.
+local function displayName(e)
+    if not e then return nil end
+    return (ns.Names and ns.Names.ForEntry(e)) or e.name
+end
+Rival.DisplayName = displayName
+
 -- A title changed hands, in one of the two directions that involve us.
 --
 -- Both outputs on purpose: chat is the durable log you can scroll back to,
@@ -142,7 +151,7 @@ function Rival:AfterLadderChange(key, tracker)
     local prevName = self.lastHolderName[key]
     local newGuid = holder and holder.guid or nil
     self.lastHolder[key] = newGuid
-    self.lastHolderName[key] = holder and holder.name or nil
+    self.lastHolderName[key] = displayName(holder)
 
     if holder and holder.tier and holder.tier > 0 and newGuid ~= prevGuid then
         local title = titleFor(tracker, holder.tier) or (tracker and tracker.name) or key
@@ -150,7 +159,7 @@ function Rival:AfterLadderChange(key, tracker)
         if newGuid == me and prevGuid and prevGuid ~= me then
             self:AnnounceSteal("took", title, prevName, holder.count)
         elseif prevGuid == me and newGuid ~= me then
-            self:AnnounceSteal("lost", title, holder.name, holder.count)
+            self:AnnounceSteal("lost", title, displayName(holder), holder.count)
         end
     end
 
@@ -696,7 +705,7 @@ function Rival:OnClaim(msg)
     local guid = msg.guid
     if not guid then return end
     ns.Ladder:RecordClaim(key, guid,
-        { name = msg.name or msg.sender or guid, count = msg.count,
+        { name = msg.name or msg.sender or guid, sender = msg.sender, count = msg.count,
           tier = msg.tier, ts = msg.ts })
     self:AfterLadderChange(key)
 end

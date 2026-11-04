@@ -151,7 +151,7 @@ Syntax-check every file (LuaJIT = Lua 5.1, matches WoW):
 
 Run all headless test suites (from the addon root):
 `luajit tools\test_engine.lua` · `test_ladder.lua` · `test_comm.lua` ·
-`test_rival.lua` · `test_killsource.lua` · `test_sources.lua`
+`test_rival.lua` · `test_killsource.lua` · `test_sources.lua` · `test_trp3.lua`
 
 ## Install
 
@@ -325,6 +325,7 @@ Tracking/Sources/
   EmoteSource.lua        DoEmote/PerformEmote hooks -> { kind="emote", emote, name, id }
   SpellSource.lua        UNIT_SPELLCAST_SUCCEEDED -> { kind="spell", id, name }
   FishSource.lua         fishing loot window -> { kind="fish", names }
+Integrations/TRP3.lua    TRP3 names for rivals and authors (inert without TRP3)
 UI/MainFrame.lua         the window: sidebar menu, panes, lazy pane building
 UI/MiniPanel.lua         Deeds pane -- the tracker list
 UI/NearbyPanel.lua       Nearby pane -- challenges heard, with Accept
@@ -369,9 +370,10 @@ others can adopt it — which is the "issue a challenge" feature proper.
 **M5 — UI.** Holder and your rank in the panel; "you took / lost the title"
 toasts. The data is already there; nothing renders it yet.
 
-**TRP3 integration (user idea).** Total RP 3 is the de-facto RP profile addon; hooking
-it would be a great distribution + display surface. Plan: keep this core **TRP3-agnostic**
-and add an *optional* `Integrations/TRP3.lua` shim that, only if TRP3 is loaded, surfaces
-earned titles on the player's TRP3 profile/tooltip. Standalone when TRP3 is absent.
-(A full TRP3-Extended "campaign/quest" module is heavier and would bind us to their data
-model — revisit once the core is proven.)
+**TRP3 integration.** Done for names: with Total RP 3 installed, ladders,
+steal pop-ups and deed authors show players by their **TRP3 name** where TRP3
+knows their profile, and by game name otherwise (`Integrations/TRP3.lua`,
+public TRP3 API only; `/deed rpnames` turns it off). The core stays
+TRP3-agnostic and works the same without it. Showing *earned titles* on a
+TRP3 profile, or a TRP3-Extended "campaign/quest" module, would bind us to
+their data model — revisit once the core is proven between real players.

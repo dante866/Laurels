@@ -58,6 +58,9 @@ function Ladder:RecordClaim(deedKey, guid, claim, opts)
 
     s[guid] = {
         name = claim.name,
+        -- The server-supplied sender, for looking the player up elsewhere
+        -- (TRP3). Nil for our own claim, which is looked up by GUID.
+        sender = claim.sender,
         count = claim.count,
         tier = claim.tier or 0,
         ts = claim.ts,
@@ -88,7 +91,8 @@ function Ladder:GetHolder(deedKey)
     end
     if not bestGuid then return nil end
     local w = s[bestGuid]
-    return { guid = bestGuid, name = w.name, count = w.count, tier = w.tier, ts = w.ts }
+    return { guid = bestGuid, name = w.name, sender = w.sender, count = w.count,
+             tier = w.tier, ts = w.ts }
 end
 
 function Ladder:GetStandings(deedKey)
@@ -97,7 +101,7 @@ function Ladder:GetStandings(deedKey)
     if not s then return list end
     for guid, claim in pairs(s) do
         table.insert(list, {
-            guid = guid, name = claim.name, count = claim.count,
+            guid = guid, name = claim.name, sender = claim.sender, count = claim.count,
             tier = claim.tier, ts = claim.ts,
         })
     end
