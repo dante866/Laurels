@@ -149,9 +149,10 @@ Both `.toc` files ship together and the client picks the right one.
 
 ## Try it
 
-Everything lives in one window with three tabs — **Deeds**, **Nearby** and
+Everything lives in one TRP3-style window with a sidebar menu — **Deeds**, **Nearby** and
 **New Deed** — rather than separate frames stacking on top of each other.
-The slash commands below just open it on the right tab.
+The slash commands below just open it on the right page. With TRP3 installed
+it borrows TRP3's wooden frame art; without it, the same layout in stock textures.
 
 ```
 /deed                  toggle the window (Deeds tab)
@@ -245,7 +246,7 @@ Core.lua                 lifecycle, SavedVariables, slash commands, defaults
 Tracking/Engine.lua      owns trackers; matches signals -> increments -> tiers
 Tracking/Sources/
   KillSource.lua         combat log -> { kind="kill", name, npcID }
-UI/MainFrame.lua         the window: tab row, panes, lazy pane building
+UI/MainFrame.lua         the window: sidebar menu, panes, lazy pane building
 UI/MiniPanel.lua         Deeds pane -- the tracker list
 UI/NearbyPanel.lua       Nearby pane -- challenges heard, with Accept
 UI/AuthorForm.lua        New Deed / Edit Deed pane

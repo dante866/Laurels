@@ -169,9 +169,6 @@ local function buildAuthorPane(f)
     idText:Hide()
     f.idText = idText
 
-    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -4, -4)
-
     makeLabel(f, "Name", 20, -46)
     f.nameEdit = makeEdit(f, 230)
     f.nameEdit:SetPoint("TOPLEFT", 120, -42)
@@ -297,7 +294,7 @@ local function buildAuthorPane(f)
     zhint:SetPoint("TOPLEFT", 122, -198)
     zhint:SetText("optional \226\128\147 only counts kills in that zone")
 
-    makeLabel(f, "Tiers  (count \226\134\146 title)", 20, -224)
+    makeLabel(f, "Tiers  (count, then title)", 20, -224)
     f.tierRows = {}
     for i = 1, TIER_ROWS do
         local y = -244 - (i - 1) * 28
@@ -326,8 +323,8 @@ local function buildAuthorPane(f)
     end)
 end
 
--- Back to a blank "New Deed", including the tab label, after a save or a
--- cancel -- otherwise the tab would keep claiming to be editing.
+-- Back to a blank "New Deed", including the menu label, after a save or a
+-- cancel -- otherwise the menu would keep claiming to be editing.
 function AuthorForm:Reset()
     self.editing = nil
     ns.MainFrame:SetTabLabel("author", "New Deed")

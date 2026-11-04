@@ -1,12 +1,13 @@
 local addonName, ns = ...
 
 -- ---------------------------------------------------------------------------
--- MainFrame: the single window everything lives in, TRP3-style.
+-- MainFrame: the single window everything lives in, laid out like TRP3's.
 --
 -- Deeds, Nearby and the authoring form used to be three separate movable
 -- frames that overlapped each other and each needed closing by hand. They are
--- now panes in one window with a tab row, so there is one thing to position,
--- one thing to close, and switching between them is a click.
+-- now panes in one window with a sidebar menu down the left, so there is one
+-- thing to position, one thing to close, and switching between them is a
+-- click.
 --
 -- Panes register themselves and are BUILT LAZILY on first selection: the
 -- authoring form in particular is expensive (a zone tree walked out of the
@@ -17,8 +18,8 @@ local Main = {}
 ns.MainFrame = Main
 
 -- The standard dialog backdrop, in one place rather than copied into every
--- frame. BackdropTemplateMixin is guarded because it does not exist on every
--- client we target.
+-- frame. Still used by the toast, which is an overlay and not part of the
+-- main window's look.
 function ns.ApplyDialogBackdrop(frame)
     if not frame.SetBackdrop then return end
     frame:SetBackdrop({
@@ -29,27 +30,147 @@ function ns.ApplyDialogBackdrop(frame)
     })
 end
 
-Main.WIDTH  = 430
-Main.HEIGHT = 520
+-- Geometry. The content area is sized to what the panes were laid out for
+-- (rows 398 wide at x=4), and the window is derived from it rather than the
+-- other way round.
+Main.SIDEBAR_WIDTH = 150
+Main.WOOD          = 14   -- thickness of the wooden strips
+Main.CONTENT_LEFT  = 4 + Main.SIDEBAR_WIDTH + Main.WOOD + 8
+Main.CONTENT_WIDTH = 404
+Main.WIDTH         = Main.CONTENT_LEFT + Main.CONTENT_WIDTH + 22
+Main.HEIGHT        = 480
 
--- Tab order lives here rather than in registration order, so it doesn't
+-- TRP3's frame border colour, so the two windows sit together.
+local BORDER = { 0.48, 0.39, 0.32 }
+
+-- Menu order lives here rather than in registration order, so it doesn't
 -- silently depend on the order files appear in the .toc.
 Main.TAB_ORDER = { "deeds", "nearby", "author" }
 
 Main.panes = {}
 
--- Blizzard's top-tab template gives the proper notched look, but XML
--- templates can't be checked against the Forever API dump (it lists functions
--- and events, not templates) and these are Classic-flavoured clients. So try
--- it, and fall back to the button template already used everywhere else.
--- PanelTopTabButtonTemplate specifically, not the CharacterFrame one, whose
--- notch points downward for tabs hanging under a frame.
-local function createTabButton(parent)
-    local ok, button = pcall(CreateFrame, "Button", nil, parent,
-        "PanelTopTabButtonTemplate")
-    if ok and button then return button, true end
-    button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    return button, false
+-- When TRP3 is installed we borrow its frame art by path at runtime -- nothing
+-- of TRP3's is shipped in this addon. Checked when the window is first built,
+-- by which point every addon has loaded, so .toc load order doesn't matter.
+local TRP3_ART = "Interface\\AddOns\\totalRP3\\Resources\\UI\\"
+
+local function haveTRP3Art()
+    local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+    return isLoaded and isLoaded("totalRP3") and true or false
+end
+
+-- A wooden strip along one edge. Vertical strips tile down, horizontal ones
+-- across; the texcoords are the halves of TRP3's border sheets.
+local function woodStrip(f, vertical)
+    local t = f:CreateTexture(nil, "BORDER")
+    if vertical then
+        t:SetTexture(TRP3_ART .. "!ui-frame-wooden-border", nil, "REPEAT")
+        t:SetVertTile(true)
+        t:SetTexCoord(0.0078125, 0.2265625, 0, 1)
+        t:SetWidth(Main.WOOD)
+    else
+        t:SetTexture(TRP3_ART .. "_ui-frame-wooden-border", "REPEAT", nil)
+        t:SetHorizTile(true)
+        t:SetTexCoord(0, 1, 0.484375, 0.921875)
+        t:SetHeight(Main.WOOD)
+    end
+    t:SetVertexColor(1, 0.8, 0.8)
+    return t
+end
+
+local function applyShellArt(f)
+    local trp3 = haveTRP3Art()
+
+    if f.SetBackdrop then
+        f:SetBackdrop({
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            edgeSize = 16,
+            insets = { left = 4, right = 4, top = 4, bottom = 4 },
+        })
+        if f.SetBackdropBorderColor then
+            f:SetBackdropBorderColor(BORDER[1], BORDER[2], BORDER[3])
+        end
+    end
+
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetPoint("TOPLEFT", 4, -4)
+    bg:SetPoint("BOTTOMRIGHT", -4, 4)
+    if trp3 then
+        bg:SetTexture(TRP3_ART .. "ui-frame-neutral-background", "REPEAT", "REPEAT")
+        bg:SetHorizTile(true)
+        bg:SetVertTile(true)
+        bg:SetVertexColor(0.6, 0.6, 0.6)
+    else
+        bg:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Background", "REPEAT", "REPEAT")
+        bg:SetHorizTile(true)
+        bg:SetVertTile(true)
+        bg:SetVertexColor(1, 0.85, 0.7)
+    end
+
+    -- The sidebar sits on a slightly darker panel, as in TRP3.
+    local side = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+    side:SetPoint("TOPLEFT", 4, -4)
+    side:SetPoint("BOTTOMLEFT", 4, 4)
+    side:SetWidth(Main.SIDEBAR_WIDTH + Main.WOOD)
+    side:SetColorTexture(0, 0, 0, 0.25)
+
+    local dividerX = 4 + Main.SIDEBAR_WIDTH
+    if trp3 then
+        local l = woodStrip(f, true)
+        l:SetPoint("TOPLEFT", 4, -4); l:SetPoint("BOTTOMLEFT", 4, 4)
+        local r = woodStrip(f, true)
+        r:SetPoint("TOPRIGHT", -4, -4); r:SetPoint("BOTTOMRIGHT", -4, 4)
+        r:SetTexCoord(0.2265625, 0.0078125, 0, 1) -- mirrored
+        local t = woodStrip(f, false)
+        t:SetPoint("TOPLEFT", 4, -4); t:SetPoint("TOPRIGHT", -4, -4)
+        local b = woodStrip(f, false)
+        b:SetPoint("BOTTOMLEFT", 4, 4); b:SetPoint("BOTTOMRIGHT", -4, 4)
+        b:SetTexCoord(0, 1, 0.015625, 0.453125)
+        local d = woodStrip(f, true)
+        d:SetPoint("TOPLEFT", dividerX, -4); d:SetPoint("BOTTOMLEFT", dividerX, 4)
+    else
+        local d = f:CreateTexture(nil, "BORDER")
+        d:SetColorTexture(BORDER[1], BORDER[2], BORDER[3], 0.9)
+        d:SetWidth(2)
+        d:SetPoint("TOPLEFT", dividerX + Main.WOOD / 2, -6)
+        d:SetPoint("BOTTOMLEFT", dividerX + Main.WOOD / 2, 6)
+    end
+end
+
+-- A sidebar menu entry. Plain buttons rather than a template: the selected
+-- state is drawn here, so it looks the same on every client.
+local function createMenuButton(parent)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetSize(Main.SIDEBAR_WIDTH - 20, 26)
+
+    button.selected = button:CreateTexture(nil, "BACKGROUND")
+    button.selected:SetAllPoints()
+    button.selected:SetColorTexture(1, 0.82, 0, 0.14)
+    button.selected:Hide()
+
+    button.accent = button:CreateTexture(nil, "ARTWORK")
+    button.accent:SetPoint("TOPLEFT"); button.accent:SetPoint("BOTTOMLEFT")
+    button.accent:SetWidth(3)
+    button.accent:SetColorTexture(1, 0.82, 0, 0.9)
+    button.accent:Hide()
+
+    button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+
+    button.label = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    button.label:SetPoint("LEFT", 12, 0)
+    button.label:SetJustifyH("LEFT")
+
+    function button:SetText(text) self.label:SetText(text) end
+    function button:SetSelected(on)
+        self.selected:SetShown(on)
+        self.accent:SetShown(on)
+        if on then
+            self.label:SetTextColor(1, 1, 1)
+        else
+            self.label:SetTextColor(1, 0.82, 0)
+        end
+    end
+    return button
 end
 
 function Main:RegisterPane(key, label, build)
@@ -67,7 +188,7 @@ function Main:GetFrame()
         BackdropTemplateMixin and "BackdropTemplate" or nil)
     f:SetSize(self.WIDTH, self.HEIGHT)
     f:SetPoint("CENTER")
-    ns.ApplyDialogBackdrop(f)
+    applyShellArt(f)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
@@ -78,40 +199,36 @@ function Main:GetFrame()
     f:Hide()
     table.insert(UISpecialFrames, "DeedkeeperFrame") -- ESC closes
 
+    local menuLeft = 4 + self.WOOD + 2
+
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.title:SetPoint("TOP", 0, -14)
+    f.title:SetPoint("TOPLEFT", menuLeft + 4, -(self.WOOD + 14))
     f.title:SetText("Deedkeeper")
 
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -4, -4)
+    close:SetPoint("TOPRIGHT", -2, -2)
+    close:SetFrameLevel(f:GetFrameLevel() + 5)
 
-    -- Tab row, directly under the title.
+    -- Sidebar menu, under the title.
     f.tabs = {}
-    local x = 16
+    local y = -(self.WOOD + 46)
     for _, key in ipairs(self.TAB_ORDER) do
         local pane = self.panes[key]
         if pane then
-            local button, native = createTabButton(f)
-            button:SetPoint("TOPLEFT", x, -38)
+            local button = createMenuButton(f)
+            button:SetPoint("TOPLEFT", menuLeft, y)
             button:SetText(pane.label)
-            if native then
-                -- The notched template sizes itself from its text.
-                if PanelTemplates_TabResize then
-                    PanelTemplates_TabResize(button, 0)
-                end
-            else
-                button:SetSize(math.max(72, string.len(pane.label) * 9 + 20), 22)
-            end
+            button:SetSelected(false)
             button:SetScript("OnClick", function() Main:Select(key) end)
-            x = x + button:GetWidth() + 4
+            y = y - 30
             f.tabs[key] = button
         end
     end
 
     -- Everything a pane draws goes in here, so panes never touch the shell.
     f.content = CreateFrame("Frame", nil, f)
-    f.content:SetPoint("TOPLEFT", 12, -66)
-    f.content:SetPoint("BOTTOMRIGHT", -12, 12)
+    f.content:SetPoint("TOPLEFT", self.CONTENT_LEFT, -(self.WOOD + 10))
+    f.content:SetPoint("BOTTOMRIGHT", -22, self.WOOD + 8)
 
     self.frame = f
     return f
@@ -148,12 +265,7 @@ function Main:Select(key)
         local pane = self.panes[otherKey]
         if pane and pane.frame then pane.frame:Hide() end
         local button = f.tabs[otherKey]
-        if button then
-            -- The current tab is disabled: it reads as "selected" on the
-            -- notched template and as greyed-out on the fallback, and either
-            -- way clicking it again is a no-op.
-            if otherKey == key then button:Disable() else button:Enable() end
-        end
+        if button then button:SetSelected(otherKey == key) end
     end
 
     self.current = key

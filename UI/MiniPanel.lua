@@ -5,7 +5,7 @@ local addonName, ns = ...
 -- and (for published deeds) who currently holds it.
 --
 -- A pane inside MainFrame rather than a window of its own -- the shell owns
--- the backdrop, title, dragging and closing, and the tab row replaced the
+-- the backdrop, title, dragging and closing, and the sidebar menu replaced the
 -- New Deed / Nearby buttons that used to sit along the bottom.
 -- ---------------------------------------------------------------------------
 
@@ -32,7 +32,7 @@ local function buildDeedsPane(f)
 
     local empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
     empty:SetPoint("CENTER", 0, 10)
-    empty:SetText("No deeds yet.\nUse the |cff66ccffNew Deed|r tab above.\n\n"
+    empty:SetText("No deeds yet.\nPick |cff66ccffNew Deed|r on the left.\n\n"
         .. "|cff999999A deed is a thing to count\nplus the titles you earn for it.|r")
     empty:Hide()
     f.empty = empty
@@ -264,7 +264,7 @@ function UI:Refresh()
 end
 
 -- Called by the rival layer when a new published deed is heard. The pending
--- count rides on the tab itself, so an unopened Nearby pane still advertises
+-- count rides on the menu entry itself, so an unopened Nearby pane still advertises
 -- that something is waiting.
 function UI:RefreshNearby()
     if ns.Nearby then ns.Nearby:Refresh() end
