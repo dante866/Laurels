@@ -301,6 +301,9 @@ SlashCmdList.DEEDKEEPER = function(msg)
     elseif cmd == "commtest" then
         if ns.Diag then ns.Diag:CommTest() end
 
+    elseif cmd == "tiptest" then
+        if ns.UnitTooltip then ns.UnitTooltip:Report() end
+
     elseif cmd == "rivals" then
         local t = ns.Engine:GetTracker(rest)
         if not t then
@@ -404,6 +407,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("  /deed rivals <id>     show the leaderboard for a deed")
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")
         ns:Print("  /deed commtest        test whether addon messages work (diagnostic)")
+        ns:Print("  /deed tiptest         why a mob's tooltip does/doesn't list deeds (diagnostic)")
         ns:Print("  /deed simrival <id> <count> <name>")
         ns:Print("                        fake a rival, to test stealing solo")
         ns:Print("  /deed toasts [on|off|quiet|test]")
