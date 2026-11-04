@@ -537,5 +537,53 @@ check("simoffer stall leaves it short", simStall and SR:MissingTiers(simStall) >
 check("so Accept is refused", select(2, SR:Adopt(SR.SIM_LONG_UUID)) == "it's still arriving")
 SR:ClearSimulatedOffer()
 check("clear forgets the long one too", SR:KnownDeeds()[SR.SIM_LONG_UUID] == nil)
+
+-- 13. "Titles held": how many contested deeds you lead, read off the ladders.
+local H, Riv = makeClient("Hoarder"), makeClient("Challenger")
+assert(loadfile("Tracking/Sources/HoldSource.lua"))("Laurels", H.ns)
+H.ns.Engine:RegisterSource("hold", H.ns.HoldSource)
+connect({ H, Riv })
+
+local function ratDeed()
+    return { id = "rats", name = "Rat Catching", event = "kill",
+        match = { nameContains = "Rat" }, published = true, uuid = "DEED-RATS",
+        tiers = { { count = 1000, title = "Ratter" } } }
+end
+H.ns.db.trackers[2] = ratDeed()
+Riv.ns.db.trackers[2] = ratDeed()
+local hoard = { id = "hoard", name = "Title Hoarding", event = "hold", match = {},
+    tiers = { { count = 1, title = "Hoarder" }, { count = 2, title = "Title Hoarder" } } }
+local ratHoard = { id = "rathoard", name = "Rat King", event = "hold",
+    match = { nameContains = "Rat" }, tiers = { { count = 1, title = "Rat King" } } }
+H.ns.db.trackers[3], H.ns.db.trackers[4] = hoard, ratHoard
+H.ns.HoldSource:Recompute()
+local HE = H.ns.Engine
+
+farm(H, "Kobold", 1000)
+check("leading an uncontested deed doesn't count", HE:GetProgress("hoard") == 0)
+
+farm(Riv, "Kobold", 5)
+check("once a rival joins, it counts", HE:GetProgress("hoard") == 1)
+check("and earns the first tier", HE:CurrentTitle(hoard) == "Hoarder")
+
+farm(H, "Rat", 10)
+farm(Riv, "Rat", 1)
+check("leading two contested deeds counts two", HE:GetProgress("hoard") == 2)
+check("the name filter counts only matching deeds", HE:GetProgress("rathoard") == 1)
+check("reaching two earns the second tier", HE:CurrentTitle(hoard) == "Title Hoarder")
+
+farm(Riv, "Kobold", 1500)
+check("losing a deed lowers the count", HE:GetProgress("hoard") == 1)
+check("but the title earned is kept", HE:CurrentTitle(hoard) == "Title Hoarder")
+check("and the next tier is beyond it", HE:NextTier(hoard) == nil)
+
+H.ns.db.trackers[2].published = false
+H.ns.HoldSource:Recompute()
+check("an unpublished deed doesn't count", HE:GetProgress("hoard") == 0)
+
+hoard.published, hoard.uuid = true, "DEED-HOARD"
+H.ns.HoldSource:Recompute()
+check("a held-titles deed never counts itself", HE:GetProgress("hoard") == 0)
+check("the challenger's client is unaffected", Riv.ns.Engine:GetProgress("hoard") == 0)
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

@@ -284,7 +284,7 @@ local function buildAuthorPane(f)
     hint:SetText("optional, comma-separated \226\128\147 narrows the match")
     f.idsHint = hint
 
-    makeLabel(f, "Zone", 20, -178)
+    f.zoneLabel = makeLabel(f, "Zone", 20, -178)
     local dd = CreateFrame("Frame", "LaurelsZoneDropDown", f,
         "UIDropDownMenuTemplate")
     dd:SetPoint("TOPLEFT", 104, -172)
@@ -565,7 +565,12 @@ function AuthorForm:SetKind(kind)
     f.idsHint:SetShown(ids)
     if ids then f.idsLabel:SetText(def.idsLabel) end
 
-    f.zoneHint:SetText(def.zoneHint)
+    -- Kinds with no "where" (titles held) hide the zone row entirely.
+    local zone = not def.noZone
+    f.zoneLabel:SetShown(zone)
+    f.zoneDrop:SetShown(zone)
+    f.zoneHint:SetShown(zone)
+    f.zoneHint:SetText(def.zoneHint or "")
 end
 
 function AuthorForm:Clear()
@@ -676,7 +681,7 @@ function AuthorForm:Save()
 
     -- A zone on its own is a legitimate deed ("500 kills in Westfall"), so it
     -- counts toward the deed matching something.
-    local zc = f.zoneChoice
+    local zc = (not def.noZone) and f.zoneChoice
     if zc then
         if zc.zone then match.zone = zc.zone end
         if zc.zoneID then match.zoneID = zc.zoneID end

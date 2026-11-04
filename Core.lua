@@ -109,9 +109,12 @@ local function initModules()
     ns.Engine:RegisterSource("emote", ns.EmoteSource)
     ns.Engine:RegisterSource("spell", ns.SpellSource)
     ns.Engine:RegisterSource("fish", ns.FishSource)
+    ns.Engine:RegisterSource("hold", ns.HoldSource)
     if ns.UI and ns.UI.Init then ns.UI:Init() end
     if ns.MinimapButton then ns.MinimapButton:Init() end
     if ns.Rival and ns.Rival.Init then ns.Rival:Init() end
+    -- After the rival layer, whose ladders it reads.
+    if ns.HoldSource then ns.HoldSource:Recompute() end
     ns:Print(("v%s loaded. /laurels or /deed to open the panel, /deed help for commands.")
         :format(ns.version))
     if not ns.db.seenIntro then
@@ -184,6 +187,7 @@ SlashCmdList.LAURELS = function(msg)
             -- rival accept it by name instead of being told a uuid by hand.
             ns.Rival:BroadcastDef(t)
             ns.Rival:ForceBroadcast(t)
+            if ns.HoldSource then ns.HoldSource:Recompute() end
         end
 
     elseif cmd == "rpnames" then
@@ -279,6 +283,7 @@ SlashCmdList.LAURELS = function(msg)
         local t = ns.Engine:GetTracker(rest)
         if t then
             t.published = false
+            if ns.HoldSource then ns.HoldSource:Recompute() end
             ns:Print("unpublished:", ns.Comm.Escape(t.name))
         else
             ns:Print("no tracker with id:", rest ~= "" and rest or "(none given)")

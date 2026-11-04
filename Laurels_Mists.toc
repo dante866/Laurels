@@ -40,6 +40,7 @@ Tracking\Sources\DeathSource.lua
 Tracking\Sources\EmoteSource.lua
 Tracking\Sources\SpellSource.lua
 Tracking\Sources\FishSource.lua
+Tracking\Sources\HoldSource.lua
 Rival\Ladder.lua
 Rival\Comm.lua
 Rival\Rival.lua

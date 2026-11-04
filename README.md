@@ -219,10 +219,17 @@ a name filter and a zone; the labels change to say what the name refers to.
 | **Emote** | emotes you perform | which emote, target name, target NPC IDs | 50 `/hug`s, target has "Rabbit" |
 | **Spell cast** | casts you finish, including item use and crafting | spell name, spell IDs | 100 Hearthstones |
 | **Fishing** | catches (one per loot window) | caught item name | 1000 catches |
+| **Titles held** | contested deeds you currently lead | deed name | *Title Hoarder*: lead 5 |
 
 Kill and spell deeds need at least one filter — unfiltered they would count
 every kill or every internal cast. The others are fine unfiltered ("die 100
 times").
+
+**Titles held** isn't counted from events: it's how many of your published
+deeds you hold rank 1 in right now, read off the ladders, so it goes down
+when someone takes one from you. A title you've earned from it is kept. Only
+**contested** deeds count — at least one other player on the ladder — so
+publishing deeds nobody else plays doesn't make you a hoarder.
 
 Things to know:
 - **Melee swings** count hits, not misses, dodges or parries. Special attacks
@@ -325,6 +332,7 @@ Tracking/Sources/
   EmoteSource.lua        DoEmote/PerformEmote hooks -> { kind="emote", emote, name, id }
   SpellSource.lua        UNIT_SPELLCAST_SUCCEEDED -> { kind="spell", id, name }
   FishSource.lua         fishing loot window -> { kind="fish", names }
+  HoldSource.lua         ladders -> how many contested deeds you lead (set, not counted)
 Integrations/TRP3.lua    TRP3 names for rivals and authors (inert without TRP3)
 UI/MainFrame.lua         the window: sidebar menu, panes, lazy pane building
 UI/MiniPanel.lua         Deeds pane -- the tracker list

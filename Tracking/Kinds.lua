@@ -25,7 +25,7 @@ local addonName, ns = ...
 local Kinds = {}
 ns.Kinds = Kinds
 
-Kinds.ORDER = { "kill", "swing", "quest", "death", "emote", "spell", "fish" }
+Kinds.ORDER = { "kill", "swing", "quest", "death", "emote", "spell", "fish", "hold" }
 
 -- Qualifier lists, in menu order. `any` labels the unfiltered choice.
 --
@@ -110,6 +110,14 @@ Kinds.defs = {
         nameLabel = "Catch name has",
         -- No ids: a catch is a loot window, and item ids aren't asked for.
         zoneHint = "optional \226\128\147 only counts catches in that zone",
+    },
+    -- "Title Hoarder": how many contested deeds you currently lead. Its
+    -- progress is worked out from the ladders, not counted from events
+    -- (Sources/HoldSource.lua), so it has no zone and no ids.
+    hold = {
+        label = "Titles held", plural = "contested deeds you lead",
+        nameLabel = "Deed name has",
+        noZone = true,
     },
 }
 

@@ -165,6 +165,8 @@ function Rival:AfterLadderChange(key, tracker)
 
     if ns.UI and ns.UI.Refresh then ns.UI:Refresh() end
     if self.onHolderChange then self.onHolderChange(key, holder, prevName) end
+    -- A holder change can change how many deeds we lead.
+    if ns.HoldSource then ns.HoldSource:Recompute() end
 end
 
 function Rival:ForceBroadcast(tracker)

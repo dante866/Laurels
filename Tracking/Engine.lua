@@ -22,6 +22,12 @@ Engine.sources = {}
 -- the engine's headless tests load it without Comm.
 local function safe(s) return (ns.Comm and ns.Comm.Escape(s)) or s end
 
+-- Adding, editing or deleting a deed can change how many contested deeds
+-- you lead, which "titles held" deeds count (Sources/HoldSource.lua).
+local function holdsChanged()
+    if ns.HoldSource and ns.HoldSource.Recompute then ns.HoldSource:Recompute() end
+end
+
 -- --- matching -------------------------------------------------------------
 
 local function matches(criteria, signal)
@@ -124,14 +130,24 @@ function Engine:CurrentTierIndex(tracker, count)
     return idx
 end
 
+-- The title you hold for a deed: the best tier you've earned, even if the
+-- count has since dropped below it. Counts only ever fall for deeds that
+-- measure a current state (titles held), and a title once earned is kept --
+-- the same as any achievement. For counted deeds this is just the tier the
+-- count reaches, since their counts only go up (and a reset clears earned).
+function Engine:HeldTierIndex(tracker)
+    local earned = ns.charDB and ns.charDB.earned[tracker.id] or 0
+    return math.max(self:CurrentTierIndex(tracker), earned)
+end
+
 function Engine:CurrentTitle(tracker)
-    local idx = self:CurrentTierIndex(tracker)
+    local idx = self:HeldTierIndex(tracker)
     local tier = tracker.tiers and tracker.tiers[idx]
     return tier and tier.title or nil, idx
 end
 
 function Engine:NextTier(tracker)
-    local idx = self:CurrentTierIndex(tracker)
+    local idx = self:HeldTierIndex(tracker)
     return tracker.tiers and tracker.tiers[idx + 1] or nil
 end
 
@@ -168,10 +184,10 @@ function Engine:ReportProgress(signal)
     end
 end
 
-function Engine:Increment(tracker, amount)
-    local progress = ns.charDB.progress
-    local cur = (progress[tracker.id] or 0) + (amount or 1)
-    progress[tracker.id] = cur
+-- Store a new count, award any tier it newly reaches, and tell the UI and
+-- the rival layer. Earned tiers only ever go up here.
+local function progressTo(self, tracker, cur)
+    ns.charDB.progress[tracker.id] = cur
 
     local newTier = self:CurrentTierIndex(tracker, cur)
     local earned = ns.charDB.earned
@@ -182,8 +198,6 @@ function Engine:Increment(tracker, amount)
         local tier = tracker.tiers[newTier]
         ns:Print(("New title earned: |cffffd100%s|r  (%s: %d)")
             :format(safe(tier.title), safe(tracker.name), cur))
-        -- TODO (v2 rival layer): broadcast {tracker.id, cur, title} over an
-        -- addon comm channel so nearby Laurels users can contest it.
     end
 
     if ns.UI and ns.UI.Refresh then ns.UI:Refresh() end
@@ -192,6 +206,19 @@ function Engine:Increment(tracker, amount)
     if ns.Rival and ns.Rival.OnLocalProgress then
         ns.Rival:OnLocalProgress(tracker)
     end
+end
+
+function Engine:Increment(tracker, amount)
+    progressTo(self, tracker, (ns.charDB.progress[tracker.id] or 0) + (amount or 1))
+end
+
+-- For deeds whose progress is a current state rather than a running count
+-- (titles held): set it outright. It can fall; titles already earned stay.
+-- An unchanged value does nothing, which is also what stops a recompute
+-- triggered by our own claim from looping.
+function Engine:SetProgress(tracker, value)
+    if (ns.charDB.progress[tracker.id] or 0) == value then return end
+    progressTo(self, tracker, value)
 end
 
 -- --- authoring API --------------------------------------------------------
@@ -224,6 +251,7 @@ function Engine:CreateTracker(def)
     table.sort(def.tiers, function(a, b) return a.count < b.count end)
     table.insert(ns.db.trackers, def)
     if ns.UI and ns.UI.Refresh then ns.UI:Refresh() end
+    holdsChanged()
     return def
 end
 
@@ -251,6 +279,7 @@ function Engine:UpdateTracker(id, changes)
 
     ns.charDB.earned[id] = self:CurrentTierIndex(t)
     if ns.UI and ns.UI.Refresh then ns.UI:Refresh() end
+    holdsChanged()
     return t
 end
 
@@ -276,4 +305,5 @@ function Engine:DeleteTracker(id)
     ns.charDB.progress[id] = nil
     ns.charDB.earned[id] = nil
     if ns.UI and ns.UI.Refresh then ns.UI:Refresh() end
+    holdsChanged()
 end

@@ -350,6 +350,8 @@ check("describe: emote with target", D("emote", { emote = "HUG", nameContains = 
 check("describe: ids", D("spell", { ids = { 8690, 8691 } }) == "casts: 2 spell IDs")
 check("describe: weapon", D("swing", { weapon = "sword" }) == "melee hits: sword")
 check("describe: weapon variant", D("swing", { weapon = "sword2h" }) == "melee hits: two-handed sword")
+check("describe: titles held", D("hold", { nameContains = "Boar" })
+    == 'contested deeds you lead: deed name has "Boar"')
 check("describe: unknown kind says so", D("haircut", {}):find("can't count") ~= nil)
 
 print(("\n%d passed, %d failed"):format(passed, failed))
