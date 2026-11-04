@@ -267,35 +267,6 @@ SlashCmdList.LAURELS = function(msg)
             .. "next broadcast; Ask Again in Nearby asks for them now.")
             :format(n, n == 1 and "" or "s"))
 
-    elseif cmd == "adopt" then
-        -- Accept someone else's challenge: point one of your deeds at their
-        -- challenge id so both clients compute the same ladder key.
-        --
-        -- This is the manual half of M4. DEFPUB will carry the definition
-        -- itself so the id never has to be passed around by hand.
-        local id, uuid = rest:match("^(%S+)%s+(%S+)$")
-        if not id then
-            ns:Print("usage: /deed adopt <yourDeedId> <challengeId>")
-            ns:Print("  the challenge id comes from whoever published it")
-            ns:Print("  your deed must already count the same mobs")
-        else
-            local t = ns.Engine:GetTracker(id)
-            if not t then
-                ns:Print("no deed with id:", id)
-            else
-                t.uuid = uuid
-                t.published = true
-                t.origin = t.origin or "adopted"
-                ns.Rival:RecordOwnClaim(t)
-                ns:Print(("|cffffd100%s|r now contests challenge %s."):format(
-                    ns.Comm.Escape(t.name), uuid))
-                ns:Print(("  your count: %d \226\128\148 see the ladder with "
-                    .. "|cff66ccff/deed rivals %s|r"):format(
-                    ns.Engine:GetProgress(t.id), t.id))
-                ns.Rival:ForceBroadcast(t)
-            end
-        end
-
     elseif cmd == "unpublish" then
         local t = ns.Engine:GetTracker(rest)
         if t then
@@ -460,8 +431,6 @@ SlashCmdList.LAURELS = function(msg)
         ns:Print("  /deed publish <id>    publish a deed so others can contest it")
         ns:Print("  /deed nearby          browse challenges published nearby")
         ns:Print("  /deed undecline       offer every declined challenge again")
-        ns:Print("  /deed adopt <id> <challengeId>")
-        ns:Print("                        accept a challenge by id (/deed nearby is easier)")
         ns:Print("  /deed unpublish <id>  stop broadcasting a deed")
         ns:Print("  /deed rivals <id>     show the leaderboard for a deed")
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")

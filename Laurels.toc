@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: Laurels
-## Notes: Custom RP achievements, titles, and rival challenges. v1: tracking engine.
+## Notes: Custom RP achievements, titles, and rival challenges.
 ## Author: charl
 ## Version: 0.2.0
 ## SavedVariables: LaurelsDB

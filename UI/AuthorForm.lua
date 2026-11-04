@@ -714,9 +714,17 @@ function AuthorForm:Save()
                 .. "Progress kept."):format(
                 ns.Comm.Escape(t.name), #tiers, #tiers == 1 and "" or "s",
                 match.zone and (" in " .. match.zone) or ""))
-            if t.published then
-                ns:Print("  |cffff8800It's published|r \226\128\148 rivals who accepted it "
-                    .. "will be offered this change as an update next time it's broadcast.")
+            -- Sent now rather than at the next HELLO, so rivals who accepted
+            -- it are offered the change straight away. Only deeds we
+            -- published are ours to resend; an accepted one stays the
+            -- author's (its edit is local, and they'd ignore ours anyway).
+            if t.published and not ns.Rival:TrackerAuthor(t) then
+                ns.Rival:BroadcastDef(t)
+                ns:Print("  |cffff8800It's published|r \226\128\148 sent; rivals who accepted "
+                    .. "it are offered the change as an update.")
+            elseif t.published then
+                ns:Print("  You accepted this deed from its author, so this edit "
+                    .. "is only yours. Rivals keep the author's version.")
             end
         end
         self:Reset()

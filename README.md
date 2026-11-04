@@ -275,9 +275,6 @@ deed, the author's later edits arrive in Nearby as an **Update** to preview:
 version down. **Decline** hides an offer for good; `/deed undecline` brings
 declined offers back.
 
-`/deed adopt <yourDeedId> <challengeId>` still exists for pasting an id
-directly, but **Nearby** is the easy path.
-
 **Editing a deed.** Hit **Edit** on its row in `/deed`, or `/deed edit <id>`.
 The form opens populated, and saving **keeps the deed's id and your progress** —
 fixing a typo shouldn't cost you 400 boars.
