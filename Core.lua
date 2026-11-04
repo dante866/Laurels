@@ -184,7 +184,6 @@ SlashCmdList.LAURELS = function(msg)
             -- rival accept it by name instead of being told a uuid by hand.
             ns.Rival:BroadcastDef(t)
             ns.Rival:ForceBroadcast(t)
-            ns.Rival:WarnIfTiersShed(t)
         end
 
     elseif cmd == "minimap" then
@@ -223,8 +222,8 @@ SlashCmdList.LAURELS = function(msg)
             ns.Rival:ClearSimulatedOffer()
             ns:Print("Forgot the simulated offer. A copy you accepted stays in "
                 .. "Deeds; delete it there.")
-        elseif variant and variant ~= "update" and variant ~= "forge" then
-            ns:Print("usage: /deed simoffer [update|forge|clear]")
+        elseif variant and not ({ update = true, forge = true, long = true, stall = true })[variant] then
+            ns:Print("usage: /deed simoffer [update|forge|long|stall|clear]")
         else
             ns:Print(ns.Rival:SimulateOffer(variant))
         end
@@ -472,7 +471,7 @@ SlashCmdList.LAURELS = function(msg)
         ns:Print("                        with the last name/id (finds spell ids)")
         ns:Print("  /deed simrival <id> <count> <name>")
         ns:Print("                        fake a rival, to test stealing solo")
-        ns:Print("  /deed simoffer [update|forge|clear]")
+        ns:Print("  /deed simoffer [update|forge|long|stall|clear]")
         ns:Print("                        fake a published deed, to test Nearby solo")
         ns:Print("  /deed minimap         hide or show the minimap button")
         ns:Print("  /deed toasts [on|off|quiet|test]")

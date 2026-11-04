@@ -205,14 +205,18 @@ farm(Taker, "Kobold", 1200)
 check("the taker now holds it on the author's client",
     Author.ns.Ladder:GetHolder(KEY).name == "Taker")
 
--- An oversized definition sheds tiers rather than failing to send.
+-- An oversized definition is split, every message within the limit.
 local long = { uuid = "u", name = string.rep("N", 60), event = "kill",
     match = { nameContains = string.rep("m", 40) }, tiers = {} }
 for i = 1, 5 do
     long.tiers[i] = { count = i * 1000, title = string.rep("T", 40) }
 end
-local body = Author.ns.Comm:EncodeDef({ def = long, guid = "g", ver = "1" })
-check("an oversized definition is trimmed to fit", #body <= Author.ns.Comm.MAX_BODY)
+local longBodies = Author.ns.Comm:EncodeDefParts({ def = long, guid = "g", ver = "1" })
+local longFit = #longBodies > 1
+for _, b in ipairs(longBodies) do
+    if #b > Author.ns.Comm.MAX_BODY then longFit = false end
+end
+check("an oversized definition is split, every part within the limit", longFit)
 
 -- 11. Simulated rivals drive the whole receive path, so the steal mechanic
 -- can be developed and watched without a second player logged in.
@@ -290,21 +294,111 @@ check("quest ids are in the key",
     KeyFor({ event = "quest", match = { ids = { 62 } } }) == "quest~i=62")
 
 
--- Tier shedding: measured and reported, for published deeds with many tiers.
-local longDeed = { name = "Boar Annoyer", event = "kill", match = { nameContains = "Boar" },
+-- Long deeds: a head plus follow-ups, and nothing accepted until it's whole.
+-- This bus holds messages until flushed, so the half-arrived state can be
+-- inspected, and can lose chosen ones.
+local held = {}
+local function holdingBus(clients)
+    for _, c in ipairs(clients) do
+        c.ns.Comm:SetTransport({ Send = function(_, _, body)
+            held[#held + 1] = { from = c, body = body }
+        end })
+    end
+    return function(n, drop)
+        local sent = 0
+        while held[1] and (not n or sent < n) do
+            local m = table.remove(held, 1)
+            sent = sent + 1
+            if not (drop and drop(m.body)) then
+                for _, other in ipairs(clients) do
+                    other.ns.Comm:HandleRaw(m.body, senderFor(m.from), "CHANNEL")
+                end
+            end
+        end
+    end
+end
+
+local LA, LR, LM = makeClient("Bard"), makeClient("Reader"), makeClient("Mimic")
+LR.ns.db.trackers, LM.ns.db.trackers = {}, {}
+local clock = 1000
+for _, c in ipairs({ LA, LR, LM }) do c.ns.Rival._clockFn = function() return clock end end
+local flush = holdingBus({ LA, LR, LM })
+
+local saga = LA.ns.db.trackers[1]
+saga.uuid, saga.name, saga.origin = "DEED-SAGA", "The Long Saga", "Bard"
+saga.tiers = {}
+for i = 1, 15 do saga.tiers[i] = { count = i * 100, title = ("Saga Title Number %02d"):format(i) } end
+
+LA.ns.Rival:BroadcastDef(saga)
+check("a 15-tier deed goes out as several messages", #held > 1)
+flush(1) -- the head only
+local offer = LR.ns.Rival:KnownDeeds()["DEED-SAGA"]
+check("the head alone shows the offer", offer ~= nil and offer.tierTotal == 15)
+check("marked as still arriving", LR.ns.Rival:MissingTiers(offer) > 0)
+local arr = LR.ns.Rival:Arrival(offer)
+check("with a wait estimate", arr and arr.seconds >= 1 and not arr.stalled)
+check("and it can't be accepted yet",
+    select(2, LR.ns.Rival:Adopt("DEED-SAGA")) == "it's still arriving")
+
+-- Someone else's follow-up for it is ignored, even carrying the author's GUID.
+-- Delivered straight to the reader, so the author's real parts stay held.
+local forgedParts = LM.ns.Comm:EncodeDefParts({ guid = LA.guid, ver = "t", def = {
+    uuid = "DEED-SAGA", name = "x", event = "kill", match = {},
+    tiers = (function() local t = {} for i = 1, 15 do t[i] = { count = 1, title =
+        ("Forged Title Number %02d"):format(i) } end return t end)() } })
+for p = 2, #forgedParts do
+    LR.ns.Comm:HandleRaw(forgedParts[p], senderFor(LM), "CHANNEL")
+end
+local forged = false
+for _, t in pairs(offer.tiers) do if t.title:find("Forged") then forged = true end end
+check("a forged follow-up adds nothing", not forged)
+
+flush() -- the rest of the author's parts
+check("the follow-ups complete it", LR.ns.Rival:MissingTiers(offer) == 0
+    and offer.tiers[15].title == "Saga Title Number 15")
+check("and the wait is over", LR.ns.Rival:Arrival(offer) == nil)
+
+-- A resend while we hold it whole: the whole copy stays until the new one is.
+LA.ns.Rival:BroadcastDef(saga)
+flush(1)
+local still = LR.ns.Rival:KnownDeeds()["DEED-SAGA"]
+check("a resend doesn't replace a whole copy with half of one",
+    still == offer and LR.ns.Rival:Arrival(still) == nil)
+flush()
+
+-- A lost part: the deed stalls, and a resend recovers it.
+local lost = LA.ns.db.trackers[1]
+LA.ns.db.trackers[2] = { id = "lost", name = "Lost Parts", event = "kill",
+    match = { nameContains = "Rat" }, published = true, uuid = "DEED-LOST", origin = "Bard",
     tiers = {} }
-for i = 1, 15 do longDeed.tiers[i] = { count = i * 100, title = "A Long Title Here" } end
-local kept, total = A.ns.Rival:BroadcastTierFit(longDeed)
-check("tier fit reports the total", total == 15)
-check("tier fit reports fewer kept", kept < 15)
-local before = #A.messages
-A.ns.Rival:WarnIfTiersShed(longDeed)
-check("shedding is announced", #A.messages == before + 1
-    and A.messages[#A.messages]:find("Only the first") ~= nil)
-before = #A.messages
-A.ns.Rival:WarnIfTiersShed({ name = "x", event = "kill", match = {},
-    tiers = { { count = 1, title = "One" } } })
-check("a deed that fits says nothing", #A.messages == before)
+for i = 1, 15 do LA.ns.db.trackers[2].tiers[i] = { count = i, title = ("Lost Title Number %02d"):format(i) } end
+LA.ns.Rival:BroadcastDef(LA.ns.db.trackers[2])
+local n = #held
+flush(n - 1) -- everything but the last follow-up
+held = {}
+local stalled = LR.ns.Rival:KnownDeeds()["DEED-LOST"]
+check("missing its last part", LR.ns.Rival:MissingTiers(stalled) > 0)
+clock = clock + 30
+check("after a while it reads as stalled", LR.ns.Rival:Arrival(stalled).stalled)
+LA.ns.Rival:BroadcastDef(LA.ns.db.trackers[2]) -- what Ask Again triggers
+flush()
+local recovered = LR.ns.Rival:KnownDeeds()["DEED-LOST"]
+check("a resend recovers it", LR.ns.Rival:MissingTiers(recovered) == 0)
+check("and it can be accepted", LR.ns.Rival:Adopt("DEED-LOST") ~= nil)
+
+-- An accepted long deed: an edit to its last tier is an update, but only
+-- once every part of the new version is in.
+local mineLong = LR.ns.Rival:Adopt("DEED-SAGA")
+check("the whole saga is accepted", mineLong and #mineLong.tiers == 15)
+saga.tiers[15] = { count = 9999, title = "Saga Title Rewritten" }
+LA.ns.Rival:BroadcastDef(saga)
+flush(1)
+check("no update offered from the head alone", #LR.ns.Rival:PendingUpdates() == 0)
+flush()
+local longUps = LR.ns.Rival:PendingUpdates()
+check("the update waits once it's whole", #longUps == 1)
+local longChanges = table.concat(LR.ns.Rival:DescribeChanges(mineLong, longUps[1].deed), "\n")
+check("and names the change in its last part", longChanges:find("Tier 15", 1, true) ~= nil)
 
 -- 11. Only a deed's author can change it, and nothing changes without a click.
 local Pub  = makeClient("Publisher")
@@ -431,5 +525,17 @@ Esc.ns.Engine:Init()
 farm(Esc, "Rat", 1)
 check("an earned title is printed escaped", has(Esc, "Rat||cffff0000King"))
 check("and so is the deed name", has(Esc, "Pipe||Deed"))
+
+-- /deed simoffer long / stall. Without ns.After (as here) the follow-ups land
+-- at once, so "long" arrives whole and "stall" stays one message short.
+check("simoffer long reports its size", SR:SimulateOffer("long"):find("14 tiers") ~= nil)
+local simLong = SR:KnownDeeds()[SR.SIM_LONG_UUID]
+check("and arrives whole", simLong and SR:MissingTiers(simLong) == 0 and #simLong.tiers == 14)
+SR:SimulateOffer("stall")
+local simStall = SR:KnownDeeds()[SR.SIM_LONG_UUID]
+check("simoffer stall leaves it short", simStall and SR:MissingTiers(simStall) > 0)
+check("so Accept is refused", select(2, SR:Adopt(SR.SIM_LONG_UUID)) == "it's still arriving")
+SR:ClearSimulatedOffer()
+check("clear forgets the long one too", SR:KnownDeeds()[SR.SIM_LONG_UUID] == nil)
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

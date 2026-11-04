@@ -140,13 +140,13 @@ local function roundTrip(def)
 end
 local tiers = { { count = 5, title = "T" } }
 
--- A kill deed must encode exactly as it did before other kinds existed, or
--- older clients would stop understanding the only kind they know.
+-- The head's layout, pinned: tier total and follow-up count sit between the
+-- match fields and the tiers.
 local killBody = Comm:Encode({ type = "DEFPUB", guid = "G", ver = "t", def = {
     uuid = "U", name = "Boars", event = "kill",
     match = { nameContains = "Boar", npcIDs = { 3098 } }, tiers = tiers } })
-check("kill DEFPUB layout unchanged",
-    killBody == Comm.PROTO .. "|DEFPUB|U|G|t|Boars|kill|Boar|3098|||5|T")
+check("DEFPUB head layout",
+    killBody == Comm.PROTO .. "|DEFPUB|U|G|t|Boars|kill|Boar|3098|||1|0|5|T")
 local k = roundTrip({ uuid = "U", name = "Boars", event = "kill",
     match = { npcIDs = { 3098 } }, tiers = tiers })
 check("kill ids decode to npcIDs", k.match.npcIDs and k.match.npcIDs[1] == 3098
@@ -180,21 +180,57 @@ local unknown = Comm:Decode(Comm.PROTO .. "|DEFPUB|U|G|t|X|haircut:bald||||||5|T
 check("an unknown kind decodes without its qualifier",
     unknown.def.event == "haircut" and next(unknown.def.match) == nil)
 
--- --- tier shedding is reported ----------------------------------------------
+-- --- long deeds split into a head and follow-ups ----------------------------
 
-local many = {}
-for i = 1, 12 do many[i] = { count = i * 1000, title = "Sixteen Chars Ti" } end
-local shedMsg = { type = "DEFPUB", guid = "Player-4618-00D1568C", ver = "0.2.0",
-    def = { uuid = "D-6727a6c0-abcdef", name = "Boar Annoyer", event = "kill",
-            match = { nameContains = "Boar" }, tiers = many } }
-local shedBody, kept = Comm:EncodeDef(shedMsg)
-check("an over-long deed still fits", #shedBody <= Comm.MAX_BODY)
-check("the encoder reports how many tiers it kept", kept and kept > 0 and kept < 12)
-check("and the kept count matches what decodes",
-    #Comm:Decode(shedBody).def.tiers == kept)
-local _, allKept = Comm:EncodeDef({ type = "DEFPUB", guid = "G", ver = "t",
-    def = { uuid = "U", name = "N", event = "kill", match = {}, tiers = tiers } })
-check("a deed that fits keeps every tier", allKept == #tiers)
+local function longMsg(n, titleLen)
+    local list = {}
+    for i = 1, n do
+        list[i] = { count = i * 1000, title = string.rep("T", titleLen - 2) .. string.format("%02d", i) }
+    end
+    return { type = "DEFPUB", guid = "Player-4618-00D1568C", ver = "0.2.0",
+        def = { uuid = "D-6727a6c0-abcdef", name = "Boar Annoyer", event = "kill",
+                match = { nameContains = "Boar" }, tiers = list } }
+end
+
+local bodies = Comm:EncodeDefParts(longMsg(20, 16))
+check("a 20-tier deed needs more than one message", #bodies > 1)
+local allFit = true
+for _, b in ipairs(bodies) do if #b > Comm.MAX_BODY then allFit = false end end
+check("and every message fits", allFit)
+
+local head = Comm:Decode(bodies[1])
+check("the head says how many tiers there are", head.def.tierTotal == 20)
+check("and how many follow-ups are coming", head.def.partCount == #bodies - 1)
+
+-- Reassemble: every tier exactly once, each at its own position.
+local got = {}
+for i, t in pairs(head.def.tiers) do got[i] = t end
+for p = 2, #bodies do
+    local part = Comm:Decode(bodies[p])
+    check(("follow-up %d decodes as DEFTIERS"):format(p - 1),
+        part.type == "DEFTIERS" and part.uuid == "D-6727a6c0-abcdef" and part.part == p - 1)
+    for i, t in pairs(part.tiers) do
+        check(("tier %d isn't sent twice"):format(i), got[i] == nil)
+        got[i] = t
+    end
+end
+local intact = true
+for i = 1, 20 do
+    if not (got[i] and got[i].count == i * 1000 and got[i].title:sub(-2) == string.format("%02d", i)) then
+        intact = false
+    end
+end
+check("all 20 tiers reassemble in order", intact)
+
+-- Titles at the form's 48-character cap still split cleanly.
+local capped = Comm:EncodeDefParts(longMsg(20, 48))
+local cappedFit = true
+for _, b in ipairs(capped) do if #b > Comm.MAX_BODY then cappedFit = false end end
+check("48-character titles still fit, one or more per message", cappedFit)
+
+check("a short deed is a single message",
+    #Comm:EncodeDefParts({ guid = "G", ver = "t", def = { uuid = "U", name = "N",
+        event = "kill", match = {}, tiers = tiers } }) == 1)
 
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

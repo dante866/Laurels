@@ -127,10 +127,14 @@ We ship 1 + 2 and say so plainly in the UI copy.
 
 ## 6. Protocol sketch
 
-Prefix `LAURELS`. Body `2|TYPE|...` (proto bumped 1 → 2 to carry `guid`):
+Prefix `LAURELS`. Body `3|TYPE|...` (proto 2 added `guid`; 3 split long
+definitions across messages):
 - `HELLO|ver|name|guid` — presence, on login.
 - `CLAIM|deedKey|count|tier|name|ts|guid` — progress/holder update.
-- `DEFPUB|uuid|ver|serialized-definition` — publish/adopt a deed definition (M4).
+- `DEFPUB|uuid|guid|ver|name|event|nameContains|ids|zone|zoneID|total|parts|c|t...`
+  — a deed definition's head (M4): `total` tiers, `parts` follow-ups to come.
+- `DEFTIERS|uuid|guid|part|start|c|t...` — a follow-up: tiers from `start` on.
+  Only the deed's author (by server-supplied sender) is believed.
 - `ASK|deedKey` — request claims for a deed (handshake).
 
 `guid` is the identity for every purpose: ladder key, holder comparison, and

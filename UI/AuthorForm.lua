@@ -10,12 +10,18 @@ ns.AuthorForm = AuthorForm
 
 -- Tier rows shown on a blank form, and the most "Add 1 more tier" will give.
 -- The cap is a form-usability choice, not a storage one: a deed can hold any
--- number of tiers. What actually limits a PUBLISHED deed is the broadcast --
--- one addon message carries the whole definition, and only the tiers that fit
--- in it reach rivals (see Comm:EncodeDef).
+-- number of tiers, and a published one is sent in as many messages as its
+-- tiers need (see Comm:EncodeDefParts).
 local TIER_ROWS = 5
 local MAX_TIERS = 20
 local TIER_ROW_HEIGHT = 28
+
+-- Longest deed name and tier title, in characters. A published deed is split
+-- between messages a tier at a time, so one tier must always fit in a
+-- message of its own; these keep it (and the head) comfortably inside 240
+-- bytes even with every character escaped.
+local MAX_NAME = 48
+local MAX_TITLE = 48
 
 local function trim(s)
     return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
@@ -197,6 +203,7 @@ local function buildAuthorPane(f)
 
     makeLabel(f, "Name", 20, -46)
     f.nameEdit = makeEdit(f, 230)
+    f.nameEdit:SetMaxLetters(MAX_NAME)
     f.nameEdit:SetPoint("TOPLEFT", 120, -42)
 
     -- The kind of deed. Picking one relabels the filters below (and hides
@@ -483,6 +490,7 @@ local function makeTierRow(f, i)
     local cnt = makeEdit(f.tierChild, 70, true)
     cnt:SetPoint("TOPLEFT", 30, y)
     local ttl = makeEdit(f.tierChild, 210)
+    ttl:SetMaxLetters(MAX_TITLE)
     ttl:SetPoint("TOPLEFT", 120, y)
     for _, e in ipairs({ cnt, ttl }) do
         e:HookScript("OnEditFocusGained", function() revealTier(f, i) end)
@@ -707,9 +715,8 @@ function AuthorForm:Save()
                 ns.Comm.Escape(t.name), #tiers, #tiers == 1 and "" or "s",
                 match.zone and (" in " .. match.zone) or ""))
             if t.published then
-                ns:Print("  |cffff8800It's published|r \226\128\148 rivals are "
-                    .. "contesting the version they already have.")
-                ns.Rival:WarnIfTiersShed(t)
+                ns:Print("  |cffff8800It's published|r \226\128\148 rivals who accepted it "
+                    .. "will be offered this change as an update next time it's broadcast.")
             end
         end
         self:Reset()

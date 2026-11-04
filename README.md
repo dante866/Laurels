@@ -132,6 +132,8 @@ Accept or Decline it solo:
 /deed simoffer           the offer appears in Nearby
 /deed simoffer forge     an impostor resends it with gibberish -- ignored
 /deed simoffer update    its author edits it -- an Update to preview
+/deed simoffer long      a 14-tier deed arriving in parts -- Accept waits
+/deed simoffer stall     the same with a part lost -- shows the stalled state
 /deed simoffer clear     forget the offer (an accepted copy stays in Deeds)
 ```
 
@@ -236,14 +238,18 @@ Things to know:
 - **Finding ids:** `/deed sources` prints the last thing each type saw this
   session, with its id — cast a spell, then run it to read the spell id.
 - **Tiers:** the form starts with 5 rows; **Add 1 more tier** goes up to 20.
-  A published deed travels in one addon message (255 bytes), so only the
-  tiers that fit reach rivals — about 7 with 16-character titles, 10 with
-  short ones. Publishing or saving such a deed says how many made it.
+  Names and tier titles are capped at 48 characters.
 
-Published deeds of the new types travel in the same `DEFPUB` layout as kill
-deeds (see `Rival/Comm.lua`), so a kill deed broadcasts exactly as it always
-did. An older version of Laurels hearing a new type can accept it, but has no source
-for it, so it never counts there.
+**Long deeds travel in parts.** An addon message holds 255 bytes, about 7
+tiers, so a published deed is sent as a `DEFPUB` head plus `DEFTIERS`
+follow-ups (see `Rival/Comm.lua`). The head says how many tiers and parts
+to expect. Until every tier is in, Nearby shows the deed as arriving, with
+**Accept greyed out** and a note saying roughly how long — the author's addon
+sends one message every 0.4 seconds, so it's usually a second or two. If a
+part is lost the note says so after a few seconds, and **Ask Again** asks for
+the deed again. A deed you already hold whole stays as it is until a resent
+version has fully arrived, and an update to an accepted deed is only offered
+once it's complete.
 
 **Competing with someone.** Publish a deed and nearby players can accept it:
 

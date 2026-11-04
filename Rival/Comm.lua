@@ -26,7 +26,9 @@ local Comm = {}
 ns.Comm = Comm
 
 Comm.PREFIX = "LAURELS"
-Comm.PROTO = 2 -- bumped from 1: HELLO/CLAIM now carry a guid field
+-- 2: HELLO/CLAIM carry a guid field. 3: DEFPUB carries its tier total and
+-- follow-up count, and long definitions continue in DEFTIERS messages.
+Comm.PROTO = 3
 Comm.handlers = {}
 
 -- The shared channel every client joins. Hidden from the chat UI because
@@ -168,30 +170,31 @@ function Comm:Encode(msg)
 end
 
 -- DEFPUB carries a whole deed definition, not just a claim, so a rival can
--- adopt it without being told a uuid by hand. Layout is a fixed header then
--- variable count/title pairs:
---   DEFPUB|uuid|guid|ver|name|event|nameContains|ids|zone|zoneID|c|t|c|t...
+-- adopt it without being told a uuid by hand. A definition can outgrow one
+-- addon message (capped at 255 bytes), so it travels as a head plus as many
+-- DEFTIERS follow-ups as its remaining tiers need:
+--   DEFPUB|uuid|guid|ver|name|event|nameContains|ids|zone|zoneID|total|parts|c|t|c|t...
+--   DEFTIERS|uuid|guid|part|start|c|t|c|t...
+-- `total` is the deed's tier count and `parts` the follow-ups coming, so a
+-- receiver knows at once whether the deed is whole and roughly how long the
+-- rest will take. `start` is the tier number a follow-up's first pair fills.
 --
--- Deed kinds beyond kills were added without changing that layout, because
--- the strict version gate means a new PROTO cuts new clients off from old
--- ones entirely. Instead:
---   * `ids` holds whichever id list the kind uses (NPC, quest or spell ids),
---     decoded back to `npcIDs` for kill deeds and `ids` for the rest;
---   * a kind's qualifier (a death cause, an emote) rides in the event field
---     as "kind:value", e.g. "death:falling", "emote:HUG".
--- So a kill deed encodes byte-for-byte as it always did. An older client
--- hearing a new kind sees an event name it has no source for, and the deed
--- simply never counts there.
+-- Deed kinds: `ids` holds whichever id list the kind uses (NPC, quest or
+-- spell ids), decoded back to `npcIDs` for kill deeds and `ids` for the
+-- rest; a kind's qualifier (a death cause, an emote) rides in the event field
+-- as "kind:value", e.g. "death:falling", "emote:HUG".
 --
--- Addon messages are capped at 255 bytes, and an over-long one fails to send
--- with a result code we would misread as the channel refusing us. So the
--- encoder measures itself and sheds trailing tiers until it fits, and returns
--- how many it kept as a second value -- shedding is otherwise invisible, and
--- a rival who accepts gets only the tiers that made it. Measured: with
--- 16-character titles about 7 tiers fit; 10-character, about 10.
+-- An over-long message fails to send with a result code we would misread as
+-- the channel refusing us, so every body is measured against MAX_BODY as it
+-- is packed. Tier titles are capped in the form so one pair always fits.
 Comm.MAX_BODY = 240
 
-function Comm:EncodeDef(msg, tierLimit)
+local function tierPair(t)
+    return tostring(t.count or 0) .. "|" .. esc(t.title)
+end
+
+-- Every message a definition needs, head first. Returns the list.
+function Comm:EncodeDefParts(msg)
     local d = msg.def or {}
     local m = d.match or {}
     local event = d.event or "kill"
@@ -199,25 +202,62 @@ function Comm:EncodeDef(msg, tierLimit)
     local qualifier = kind and kind.qualifier and m[kind.qualifier]
     if qualifier then event = event .. ":" .. tostring(qualifier) end
     local ids = m.ids or m.npcIDs
-    local parts = {
+    local tiers = d.tiers or {}
+
+    local head = table.concat({
         self.PROTO, "DEFPUB", esc(d.uuid), esc(msg.guid), esc(msg.ver),
         esc(d.name), esc(event),
         esc(m.nameContains),
         esc(ids and table.concat(ids, ",") or ""),
-        esc(m.zone), tostring(m.zoneID or ""),
-    }
-    local tiers = d.tiers or {}
-    local limit = math.min(tierLimit or #tiers, #tiers)
-    for i = 1, limit do
-        parts[#parts + 1] = tostring(tiers[i].count or 0)
-        parts[#parts + 1] = esc(tiers[i].title)
+        esc(m.zone), tostring(m.zoneID or ""), tostring(#tiers),
+    }, "|")
+
+    -- Fill the head, reserving two digits for the part count it must carry
+    -- but can't know until the rest is packed.
+    local i = 1
+    local headTiers = {}
+    while tiers[i] and #head + 3 + #table.concat(headTiers) + 1 + #tierPair(tiers[i])
+            <= self.MAX_BODY do
+        headTiers[#headTiers + 1] = "|" .. tierPair(tiers[i])
+        i = i + 1
     end
 
-    local body = table.concat(parts, "|")
-    if #body > self.MAX_BODY and limit > 1 then
-        return self:EncodeDef(msg, limit - 1) -- shed a tier and remeasure
+    local follow = {}
+    while tiers[i] do
+        local start = i
+        local body = table.concat({ self.PROTO, "DEFTIERS", esc(d.uuid),
+            esc(msg.guid), tostring(#follow + 1), tostring(start) }, "|")
+        -- At least one pair per part, or a pair too long to fit anywhere
+        -- would loop forever; Send refuses the oversized result instead.
+        repeat
+            body = body .. "|" .. tierPair(tiers[i])
+            i = i + 1
+        until not tiers[i] or #body + 1 + #tierPair(tiers[i]) > self.MAX_BODY
+        follow[#follow + 1] = body
     end
-    return body, limit
+
+    local out = { head .. "|" .. tostring(#follow) .. table.concat(headTiers) }
+    for _, body in ipairs(follow) do out[#out + 1] = body end
+    return out
+end
+
+-- The head alone: what a one-message deed sends, and what Encode returns.
+function Comm:EncodeDef(msg)
+    return self:EncodeDefParts(msg)[1]
+end
+
+-- count/title pairs from field `from` on, keyed by tier number starting at
+-- `first` -- so a follow-up's tiers land at their real positions.
+local function decodeTiers(f, from, first)
+    local tiers = {}
+    local i, n = from, first
+    while f[i] and f[i + 1] do
+        local count = tonumber(f[i])
+        local title = unesc(f[i + 1])
+        if count and title ~= "" then tiers[n] = { count = count, title = title } end
+        i, n = i + 2, n + 1
+    end
+    return tiers
 end
 
 function Comm:Decode(body)
@@ -263,23 +303,21 @@ function Comm:Decode(body)
         local zoneID = tonumber(f[11])
         if zoneID then m.zoneID = zoneID end
 
-        local tiers = {}
-        local i = 12
-        while f[i] and f[i + 1] do
-            local count = tonumber(f[i])
-            local title = unesc(f[i + 1])
-            if count and title ~= "" then
-                tiers[#tiers + 1] = { count = count, title = title }
-            end
-            i = i + 2
-        end
-
+        local tiers = decodeTiers(f, 14, 1)
         return { proto = proto, type = "DEFPUB",
             uuid = orNil(unesc(f[3])), guid = orNil(unesc(f[4])),
             ver = unesc(f[5]),
             def = { uuid = orNil(unesc(f[3])), name = unesc(f[6]),
                     event = event,
-                    match = m, tiers = tiers } }
+                    match = m, tiers = tiers,
+                    tierTotal = tonumber(f[12]) or #tiers,
+                    partCount = tonumber(f[13]) or 0 } }
+    elseif t == "DEFTIERS" then
+        local start = tonumber(f[6]) or 1
+        return { proto = proto, type = "DEFTIERS",
+            uuid = orNil(unesc(f[3])), guid = orNil(unesc(f[4])),
+            part = tonumber(f[5]) or 0, start = start,
+            tiers = decodeTiers(f, 7, start) }
     end
     return { proto = proto, type = t }
 end
@@ -312,7 +350,13 @@ function Comm:SetTransport(tp)
 end
 
 function Comm:Send(msg, channel, target)
-    local body = self:Encode(msg)
+    self:SendEncoded(self:Encode(msg), msg.type, channel, target)
+end
+
+-- Send a body already encoded -- a definition's follow-ups are encoded
+-- together with its head, so they arrive here rather than through Send.
+function Comm:SendEncoded(body, msgType, channel, target)
+    local msg = { type = msgType }
     if not body or not self.transport then return end
     -- Never hand the client an over-long body: it fails with a result code
     -- the fallback logic would misread as this channel being refused, and we

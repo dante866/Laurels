@@ -18,6 +18,7 @@ Rival.HEARTBEAT = 30 -- seconds between rebroadcasts of unchanged progress
 Rival.lastHolder = {}     -- deedKey -> guid of the last known holder
 Rival.lastHolderName = {} -- deedKey -> that holder's display name
 Rival._bcast = {}
+Rival.partial = {}        -- uuid -> a definition still receiving its tiers (session only)
 
 -- A local copy helper rather than ns.deepcopy, which lives in Core.lua -- the
 -- headless suites load only Engine/Ladder/Comm/Rival, and this file stays in
@@ -253,14 +254,53 @@ function Rival:TrackerAuthor(t)
 end
 
 -- Two versions of a deed are the same if they encode the same. Reusing the
--- wire encoding means "same" is exactly "a rival would receive the same".
+-- wire encoding means "same" is exactly "a rival would receive the same" --
+-- every part of it, so a change in the last tier of a long deed still counts.
 local function signature(d)
-    local body = ns.Comm:EncodeDef({ guid = "", ver = "", def = {
+    local parts = ns.Comm:EncodeDefParts({ guid = "", ver = "", def = {
         uuid = "", name = d.name, event = d.event,
         match = d.match, tiers = d.tiers } })
-    return body
+    return table.concat(parts, "\n")
 end
 Rival.Signature = signature
+
+-- A seconds clock for arrival timing. Session time, not server time:
+-- follow-ups arrive within seconds, and GetTime is finer than GetServerTime.
+function Rival:Clock()
+    if self._clockFn then return self._clockFn() end
+    return (GetTime and GetTime()) or os.time()
+end
+
+-- How many of a heard deed's tiers haven't arrived yet.
+function Rival:MissingTiers(d)
+    local n = 0
+    for i = 1, d.tierTotal or #(d.tiers or {}) do
+        if not (d.tiers and d.tiers[i]) then n = n + 1 end
+    end
+    return n
+end
+
+-- For a deed still arriving: how far along, a rough wait, and whether it has
+-- stalled. Nil once it's whole. The author's addon sends one message every
+-- Comm.SEND_INTERVAL seconds, so parts outstanding times that interval is
+-- the wait; a part overdue by several intervals has most likely been lost.
+-- A partial deed from an earlier session has nothing more coming.
+function Rival:Arrival(d)
+    local missing = self:MissingTiers(d)
+    if missing == 0 then return nil end
+    local total = d.tierTotal or #(d.tiers or {})
+    local interval = ns.Comm.SEND_INTERVAL or 0.4
+    local left = math.max(1, (d.partCount or 1) - (d.partsReceived or 0))
+    local since = self:Clock() - (d.lastPartAt or 0)
+    local live = self.partial[d.uuid] == d
+    return {
+        missing  = missing,
+        received = total - missing,
+        total    = total,
+        seconds  = math.max(1, math.ceil(left * interval - since)),
+        stalled  = not live or since > math.max(5, left * interval * 4),
+    }
+end
 
 -- Offers worth showing: everything heard that we aren't already contesting.
 function Rival:NearbyDeeds()
@@ -284,29 +324,11 @@ local function defMessage(self, tracker)
         } }
 end
 
+-- The head, then any follow-ups, back to back through the send queue.
 function Rival:BroadcastDef(tracker)
     if not self:ShouldBroadcast(tracker) or not tracker.uuid then return end
-    ns.Comm:Send(defMessage(self, tracker))
-end
-
--- How many of a deed's tiers fit in its broadcast, and how many it has. One
--- addon message carries the whole definition, so rivals only ever receive
--- the tiers that fit; the rest stay local to the author.
-function Rival:BroadcastTierFit(tracker)
-    local total = tracker.tiers and #tracker.tiers or 0
-    local msg = defMessage(self, tracker)
-    msg.def.uuid = msg.def.uuid or ns.genUUID() -- measure as if published
-    local _, kept = ns.Comm:EncodeDef(msg)
-    return kept or total, total
-end
-
--- Say so when a published deed has more tiers than reach rivals.
-function Rival:WarnIfTiersShed(tracker)
-    local kept, total = self:BroadcastTierFit(tracker)
-    if kept < total then
-        ns:Print(("|cffff8800Only the first %d of %d tiers fit in a broadcast.|r "
-            .. "Rivals who accept get those %d; shorter titles fit more.")
-            :format(kept, total, kept))
+    for _, body in ipairs(ns.Comm:EncodeDefParts(defMessage(self, tracker))) do
+        ns.Comm:SendEncoded(body, "DEFPUB")
     end
 end
 
@@ -320,6 +342,9 @@ function Rival:Adopt(uuid)
 
     local d = self:KnownDeeds()[uuid]
     if not d then return nil, "no such deed heard nearby" end
+    -- Nothing is accepted half-received: you'd be contesting thresholds you
+    -- never saw.
+    if self:MissingTiers(d) > 0 then return nil, "it's still arriving" end
 
     local t = ns.Engine:CreateTracker({
         name = d.name, event = d.event or "kill",
@@ -343,12 +368,49 @@ end
 --   nil       the offer, from "Simulated Rival"
 --   "update"  the same deed edited by its author (renamed, a tier added)
 --   "forge"   the same challenge id sent by someone else -- must be ignored
+--   "long"    a separate 14-tier deed, whose follow-ups arrive at the real
+--             send rate, so the greyed-out Accept and its wait are visible
+--   "stall"   that long deed with its last follow-up lost
 -- Returns a sentence saying what happened, for the slash command to print.
-Rival.SIM_UUID   = "D-SIMOFFER"
-Rival.SIM_AUTHOR = "Simulated Rival"
-local SIM_GUID   = "Player-0-SIMOFFER"
+Rival.SIM_UUID      = "D-SIMOFFER"
+Rival.SIM_LONG_UUID = "D-SIMLONG"
+Rival.SIM_AUTHOR    = "Simulated Rival"
+local SIM_GUID      = "Player-0-SIMOFFER"
+
+local LONG_TITLES = { "Boar Botherer", "Boar Bane", "Boar Legend", "Tusk Taker",
+    "Bristle Breaker", "Snout Smasher", "Hog Hunter", "Razorback Ruin",
+    "Quillboar Quieter", "Sty Scourge", "Swine Slayer", "Bacon Baron",
+    "Lord of Boars", "Boar God" }
+
+function Rival:SimulateLongOffer(stall)
+    local uuid = self.SIM_LONG_UUID
+    self.partial[uuid] = nil
+    self:KnownDeeds()[uuid] = nil
+    local def = { uuid = uuid, name = "The Long Hunt", event = "kill",
+        match = { nameContains = "Boar" }, tiers = {} }
+    for i, title in ipairs(LONG_TITLES) do
+        def.tiers[i] = { count = i * 25, title = title }
+    end
+    local bodies = ns.Comm:EncodeDefParts({ guid = SIM_GUID, ver = ns.version, def = def })
+    -- The head now; follow-ups one send interval apart, as a real author's
+    -- queue would deliver them.
+    ns.Comm:HandleRaw(bodies[1], self.SIM_AUTHOR, "SIM")
+    local last = stall and #bodies - 1 or #bodies
+    for i = 2, last do
+        local deliver = function() ns.Comm:HandleRaw(bodies[i], self.SIM_AUTHOR, "SIM") end
+        if ns.After then ns.After((i - 1) * ns.Comm.SEND_INTERVAL, deliver) else deliver() end
+    end
+    return (stall
+        and "\"The Long Hunt\" (%d tiers, %d messages) is arriving with one message lost: "
+            .. "preview it in Nearby."
+        or "\"The Long Hunt\" (%d tiers, %d messages) is arriving: preview it in Nearby now.")
+        :format(#def.tiers, #bodies)
+end
 
 function Rival:SimulateOffer(variant)
+    if variant == "long" or variant == "stall" then
+        return self:SimulateLongOffer(variant == "stall")
+    end
     local uuid = self.SIM_UUID
     local heard = self:KnownDeeds()[uuid] or self:AdoptedUUID(uuid)
 
@@ -401,10 +463,12 @@ end
 -- Forget the simulated offer, its update and any decline of it. A copy
 -- you accepted stays in Deeds; delete it there like any other.
 function Rival:ClearSimulatedOffer()
-    local uuid = self.SIM_UUID
-    self:KnownDeeds()[uuid] = nil
-    self:Updates()[uuid] = nil
-    self:Declined()[uuid] = nil
+    for _, uuid in ipairs({ self.SIM_UUID, self.SIM_LONG_UUID }) do
+        self:KnownDeeds()[uuid] = nil
+        self:Updates()[uuid] = nil
+        self:Declined()[uuid] = nil
+        self.partial[uuid] = nil
+    end
 end
 
 -- Inject a claim as though another player had broadcast it.
@@ -463,6 +527,12 @@ end
 -- challenge id: the first sender we hear for an id owns it, and a message
 -- for that id from anyone else is dropped. Ids are random and only learned
 -- from the author's own broadcast, so nobody can claim one first.
+--
+-- A long definition arrives as a head and DEFTIERS follow-ups. Until every
+-- tier is in, it waits in `partial` (this session only) and is never stored
+-- as an update or accepted. A brand-new offer shows in Nearby meanwhile,
+-- marked as still arriving; a deed we already hold keeps its current version
+-- until the replacement is whole, so a resend never leaves you holding half.
 function Rival:OnDefPub(msg)
     local d = msg.def
     if not d or not d.uuid then return end
@@ -470,6 +540,9 @@ function Rival:OnDefPub(msg)
     d.authorGuid = msg.guid
     d.origin = msg.name or msg.sender
     d.seen = self:Now()
+    d.tierTotal = d.tierTotal or #(d.tiers or {})
+    d.partsReceived = 0
+    d.lastPartAt = self:Clock()
 
     local tracker = self:AdoptedUUID(d.uuid)
     if tracker then
@@ -477,22 +550,56 @@ function Rival:OnDefPub(msg)
         -- updates; an accepted one only from its author, and never directly.
         local author = self:TrackerAuthor(tracker)
         if not author or author ~= d.author then return end
+    else
+        if self:Declined()[d.uuid] then return end
+        local author = authorOf(self:KnownDeeds()[d.uuid])
+        if author and author ~= d.author then return end -- not theirs to change
+    end
+
+    if self:MissingTiers(d) > 0 then
+        self.partial[d.uuid] = d
+        if not tracker and not self:KnownDeeds()[d.uuid] then
+            self:KnownDeeds()[d.uuid] = d
+        end
+        if ns.UI and ns.UI.RefreshNearby then ns.UI:RefreshNearby() end
+        return
+    end
+    self.partial[d.uuid] = nil
+    self:StoreDef(d, tracker)
+end
+
+-- A follow-up: more tiers for a definition still arriving. Only its
+-- author's, and only for the version whose head we hold.
+function Rival:OnDefTiers(msg)
+    local d = msg.uuid and self.partial[msg.uuid]
+    if not d or msg.sender ~= d.author then return end
+    for i, tier in pairs(msg.tiers or {}) do
+        if i >= 1 and i <= d.tierTotal then d.tiers[i] = tier end
+    end
+    d.partsReceived = (d.partsReceived or 0) + 1
+    d.lastPartAt = self:Clock()
+
+    if self:MissingTiers(d) == 0 then
+        self.partial[d.uuid] = nil
+        self:StoreDef(d, self:AdoptedUUID(d.uuid))
+    elseif ns.UI and ns.UI.RefreshNearby then
+        ns.UI:RefreshNearby()
+    end
+end
+
+-- A complete definition from its author: the offer, or an update to the
+-- deed we accepted if it differs from ours.
+function Rival:StoreDef(d, tracker)
+    if tracker then
         local sig = signature(d)
         if sig == signature(tracker) or sig == tracker.ignoredUpdate then
             self:Updates()[d.uuid] = nil -- nothing new, or already turned down
         else
             self:Updates()[d.uuid] = d
         end
-        if ns.UI and ns.UI.RefreshNearby then ns.UI:RefreshNearby() end
-        return
+    else
+        self:KnownDeeds()[d.uuid] = d
     end
-
-    if self:Declined()[d.uuid] then return end
-    local known = self:KnownDeeds()[d.uuid]
-    local author = authorOf(known)
-    if author and author ~= d.author then return end -- not theirs to change
-
-    self:KnownDeeds()[d.uuid] = d
     if ns.UI and ns.UI.RefreshNearby then ns.UI:RefreshNearby() end
 end
 
@@ -502,6 +609,7 @@ function Rival:Decline(uuid)
     if not d then return nil, "no such deed heard nearby" end
     self:Declined()[uuid] = { name = d.name, author = authorOf(d), at = self:Now() }
     self:KnownDeeds()[uuid] = nil
+    self.partial[uuid] = nil
     return true
 end
 
@@ -619,6 +727,8 @@ function Rival:WireHandlers()
     ns.Comm:On("HELLO", function(m) self:OnHello(m) end)
     ns.Comm:On("ASK", function(m) self:OnAsk(m) end)
     ns.Comm:On("DEFPUB", function(m) self:OnDefPub(m) end)
+    ns.Comm:On("DEFTIERS", function(m) self:OnDefTiers(m) end)
+    self.partial = self.partial or {}
 end
 
 function Rival:Init()

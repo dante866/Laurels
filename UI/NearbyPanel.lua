@@ -101,7 +101,44 @@ local function buildDetail(f)
     v.accept  = button("Accept", "BOTTOMRIGHT", -4)
     v.back:SetScript("OnClick", function() Nearby:ClosePreview() end)
 
+    -- While a deed is still arriving: why Accept is greyed out, and how long
+    -- for. Sits just above the buttons.
+    v.note = v:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    v.note:SetPoint("BOTTOMLEFT", 4, 34)
+    v.note:SetPoint("BOTTOMRIGHT", -132, 34)
+    v.note:SetJustifyH("LEFT")
+    v.note:Hide()
+
+    -- Shown only when a part seems lost: asks the author to send it all again.
+    v.ask = CreateFrame("Button", nil, v, "UIPanelButtonTemplate")
+    v.ask:SetSize(120, 22)
+    v.ask:SetPoint("BOTTOMRIGHT", -4, 32)
+    v.ask:SetText("Ask Again")
+    v.ask:SetScript("OnClick", function() Nearby:AskAgain() end)
+    v.ask:Hide()
+
     f.detail = v
+end
+
+-- A HELLO prompts every client in range to resend what it publishes, which
+-- is also how a late arrival -- or a lost follow-up -- catches up.
+function Nearby:AskAgain()
+    ns.Comm:Send({ type = "HELLO", ver = ns.version,
+        name = ns.Rival:MyName(), guid = ns.Rival:MyGuid() })
+    ns:Print("asked nearby players to resend their published deeds\226\128\166")
+end
+
+-- While a preview shows a deed still arriving, re-render it every second so
+-- the wait counts down and a stall shows up. One timer at a time.
+function Nearby:TickWhileArriving()
+    if self.ticking or not ns.After then return end
+    self.ticking = true
+    ns.After(1, function()
+        self.ticking = false
+        if self.previewing and self.frame and self.frame:IsShown() then
+            self:Refresh()
+        end
+    end)
 end
 
 local function buildNearbyPane(f)
@@ -144,13 +181,7 @@ local function buildNearbyPane(f)
     refresh:SetSize(110, 24)
     refresh:SetPoint("BOTTOMLEFT", 4, 4)
     refresh:SetText("Ask Again")
-    refresh:SetScript("OnClick", function()
-        -- A HELLO prompts every client in range to resend what it publishes,
-        -- which is also how a late arrival catches up.
-        ns.Comm:Send({ type = "HELLO", ver = ns.version,
-            name = ns.Rival:MyName(), guid = ns.Rival:MyGuid() })
-        ns:Print("asked nearby players to resend their published deeds\226\128\166")
-    end)
+    refresh:SetScript("OnClick", function() Nearby:AskAgain() end)
 
     buildDetail(f)
 end
@@ -176,6 +207,8 @@ function Nearby:ShowDetail(item)
     local v = self.frame.detail
     local d = item.deed
     local lines = {}
+    -- Updates are only ever stored whole, so only an offer can be arriving.
+    local arrival = item.kind == "offer" and ns.Rival:Arrival(d) or nil
 
     if item.kind == "update" then
         v.title:SetText("Update: " .. (esc(d.name) or "?"))
@@ -210,8 +243,10 @@ function Nearby:ShowDetail(item)
         lines[#lines + 1] = "|cffffd100Counts|r  " .. esc(describe(d))
         lines[#lines + 1] = " "
         lines[#lines + 1] = "|cffffd100Tiers|r"
-        for i, tier in ipairs(d.tiers or {}) do
-            lines[#lines + 1] = tierLine(i, tier)
+        for i = 1, d.tierTotal or #(d.tiers or {}) do
+            local tier = d.tiers and d.tiers[i]
+            lines[#lines + 1] = tier and tierLine(i, tier)
+                or ("  %d. |cff808080(still arriving)|r"):format(i)
         end
         lines[#lines + 1] = " "
         lines[#lines + 1] = "|cff999999Accept copies this deed exactly, so you and the"
@@ -235,6 +270,30 @@ function Nearby:ShowDetail(item)
                 .. "brings back everything you've declined."):format(esc(d.name) or "?"))
             done()
         end)
+    end
+
+    -- A deed still arriving can't be accepted: you'd be contesting
+    -- thresholds you never saw. Decline still works.
+    if arrival then
+        v.accept:Disable()
+        if arrival.stalled then
+            v.note:SetText(("|cffff8800%d of its %d tiers haven't arrived.|r A message "
+                .. "was probably lost; Ask Again requests the deed again.")
+                :format(arrival.missing, arrival.total))
+            v.ask:Show()
+        else
+            v.note:SetText(("|cffffd100Receiving tiers: %d of %d|r, about %d second%s. "
+                .. "Accept unlocks when they're all here.")
+                :format(arrival.received, arrival.total, arrival.seconds,
+                    arrival.seconds == 1 and "" or "s"))
+            v.ask:Hide()
+        end
+        v.note:Show()
+        self:TickWhileArriving()
+    else
+        v.accept:Enable()
+        v.note:Hide()
+        v.ask:Hide()
     end
 
     v.body:SetText(table.concat(lines, "\n"))
@@ -266,7 +325,8 @@ function Nearby:Refresh()
         if item then
             local d = item.deed
             row.item = item
-            local tiers = d.tiers and #d.tiers or 0
+            local tiers = d.tierTotal or (d.tiers and #d.tiers) or 0
+            local arrival = item.kind == "offer" and ns.Rival:Arrival(d)
             if item.kind == "update" then
                 local n = #ns.Rival:DescribeChanges(item.tracker, d)
                 row.text:SetText(("|cffffd100Update:|r %s\n|cff999999   by %s \226\128\148 %d change%s|r")
@@ -274,9 +334,14 @@ function Nearby:Refresh()
                         n, n == 1 and "" or "s"))
             else
                 -- Deed name and author arrive over the wire as free text.
-                row.text:SetText(("%s\n|cff999999   by %s \226\128\148 %d tier%s|r"):format(
+                local status = arrival
+                    and (arrival.stalled and ("  |cffff8800(%d of %d tiers, stalled)|r")
+                        or ("  |cffffd100(receiving %d of %d)|r"))
+                        :format(arrival.received, arrival.total)
+                    or ""
+                row.text:SetText(("%s\n|cff999999   by %s \226\128\148 %d tier%s|r%s"):format(
                     esc(d.name) or "?", esc(d.origin) or "someone",
-                    tiers, tiers == 1 and "" or "s"))
+                    tiers, tiers == 1 and "" or "s", status))
             end
             local uuid = item.uuid
             row.preview:SetScript("OnClick", function() Nearby:Preview(uuid) end)
