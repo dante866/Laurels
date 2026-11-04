@@ -9,7 +9,8 @@ local addonName, ns = ...
 -- drag that walks it around the minimap edge. The angle is saved per
 -- character, since minimap layouts differ between characters.
 --
--- Left-click toggles the window, right-click opens Nearby. /deed minimap
+-- Left-click toggles the window, shift-click opens a blank New Deed,
+-- right-click opens Nearby. /deed minimap
 -- hides or shows it.
 -- ---------------------------------------------------------------------------
 
@@ -45,31 +46,32 @@ local function makeButton()
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
-    -- The coin border sits off-centre in its texture, so it is offset; it is
-    -- hosted in its own frame because UnitMode found Texture:SetPoint takes
-    -- only one argument on a Classic 1.x client.
-    local borderHost = CreateFrame("Frame", nil, b)
-    borderHost:SetSize(53, 53)
-    borderHost:SetPoint("CENTER", b, "CENTER", 10, -10)
-    local border = borderHost:CreateTexture(nil, "OVERLAY")
-    border:SetAllPoints()
+    -- Geometry is LibDBIcon's Classic layout (read from the copy TRP3
+    -- bundles), because the ring sits off-centre in its texture and its hole
+    -- is NOT at the button's centre. Centring the icon on the button, as
+    -- UnitMode does, left it visibly low and left in the ring.
+    local border = b:CreateTexture(nil, "OVERLAY")
+    border:SetSize(53, 53)
+    border:SetPoint("TOPLEFT", 0, 0)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 
     local bg = b:CreateTexture(nil, "BACKGROUND")
     bg:SetSize(20, 20)
+    bg:SetPoint("TOPLEFT", 7, -5)
     bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-    bg:SetPoint("CENTER")
 
-    -- The wreath is our own art (tools/make_icon.ps1), not a game icon.
+    -- The wreath is our own art (tools/make_icon.ps1), not a game icon, and
+    -- fills the dark disc exactly.
     local icon = b:CreateTexture(nil, "ARTWORK")
     icon:SetSize(20, 20)
+    icon:SetPoint("TOPLEFT", 7, -5)
     icon:SetTexture(ICON)
-    icon:SetPoint("CENTER")
 
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:SetText("Laurels", 1, 0.82, 0)
         GameTooltip:AddLine("Click to open your deeds", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Shift-click: New Deed", 0.8, 0.8, 0.8)
         local n = pendingCount()
         if n > 0 then
             GameTooltip:AddLine(("Right-click: Nearby (%d waiting)"):format(n), 0.4, 1, 0.4)
@@ -84,7 +86,9 @@ local function makeButton()
     -- A click that ends a drag isn't a click.
     b:SetScript("OnClick", function(self, mouse)
         if not self.wasDragging then
-            if mouse == "RightButton" then
+            if mouse == "LeftButton" and IsShiftKeyDown() then
+                ns.AuthorForm:Open() -- a blank New Deed
+            elseif mouse == "RightButton" then
                 ns.MainFrame:Show("nearby")
             else
                 ns.MainFrame:Toggle("deeds")

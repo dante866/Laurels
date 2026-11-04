@@ -167,9 +167,9 @@ Everything lives in one TRP3-style window with a sidebar menu — **Deeds**, **N
 The slash commands below just open it on the right page. With TRP3 installed
 it borrows TRP3's wooden frame art; without it, the same layout in stock textures.
 
-The **wreath on the minimap** opens it too: click for your deeds, right-click
-for Nearby (its tooltip says how many are waiting), drag to move it around the
-minimap edge. `/deed minimap` hides or shows it.
+The **wreath on the minimap** opens it too: click for your deeds, shift-click
+for a new one, right-click for Nearby (its tooltip says how many are waiting),
+drag to move it around the minimap edge. `/deed minimap` hides or shows it.
 
 ```
 /deed                  toggle the window (Deeds tab)

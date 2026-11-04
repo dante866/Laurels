@@ -17,7 +17,9 @@ $leaf    = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArg
 $edge    = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 10, 45, 16)), 1.3
 $stemPen = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 30, 105, 40)), 2.4
 
-[double]$cx = 32; [double]$cy = 31; [double]$r = 21
+# cy sits above the canvas centre on purpose: the wreath is open at the top,
+# so its leaves are bottom-heavy and a geometric centre looks low.
+[double]$cx = 32; [double]$cy = 28; [double]$r = 21
 
 # A branch follows an arc around (cx, cy). theta is math-convention degrees
 # (y up); mirror = 1 draws the left branch, -1 the right.
