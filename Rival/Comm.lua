@@ -25,13 +25,13 @@ local addonName, ns = ...
 local Comm = {}
 ns.Comm = Comm
 
-Comm.PREFIX = "DEEDK"
+Comm.PREFIX = "LAURELS"
 Comm.PROTO = 2 -- bumped from 1: HELLO/CLAIM now carry a guid field
 Comm.handlers = {}
 
 -- The shared channel every client joins. Hidden from the chat UI because
 -- clients join it temporarily and never print its traffic.
-Comm.CHANNEL_NAME = "Deedkeeper"
+Comm.CHANNEL_NAME = "Laurels"
 Comm.DEFAULT_CHANNEL = "CHANNEL"
 
 -- Which chat types a client will carry addon messages over is a per-client

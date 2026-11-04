@@ -10,7 +10,7 @@ local addonName, ns = ...
 local Diag = {}
 ns.Diag = Diag
 
-local PROBE_PREFIX = "DEEDKPROBE"
+local PROBE_PREFIX = "LAURELSPROBE"
 
 local function line(label, value)
     ns:Print(("  %s = %s"):format(label, tostring(value)))
@@ -90,8 +90,8 @@ end
 -- this pipe, so we find out before building more on top of it.
 -- ---------------------------------------------------------------------------
 
-local COMM_TEST_PREFIX = "DEEDKTEST"
-local TEST_CHANNEL = "DeedkeeperTest"
+local COMM_TEST_PREFIX = "LAURELSTEST"
+local TEST_CHANNEL = "LaurelsTest"
 
 local after = ns.After -- shared timer helper from Core.lua
 

@@ -264,7 +264,7 @@ end
 function Main:GetFrame()
     if self.frame then return self.frame end
 
-    local f = CreateFrame("Frame", "DeedkeeperFrame", UIParent,
+    local f = CreateFrame("Frame", "LaurelsFrame", UIParent,
         BackdropTemplateMixin and "BackdropTemplate" or nil)
     f:SetSize(self.WIDTH, self.HEIGHT)
     f:SetPoint("CENTER")
@@ -277,13 +277,13 @@ function Main:GetFrame()
     f:SetFrameStrata("DIALOG")
     f:SetClampedToScreen(true)
     f:Hide()
-    table.insert(UISpecialFrames, "DeedkeeperFrame") -- ESC closes
+    table.insert(UISpecialFrames, "LaurelsFrame") -- ESC closes
 
     local menuLeft = 4 + self.WOOD + 2
 
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     f.title:SetPoint("TOPLEFT", menuLeft + 4, -(self.WOOD + 14))
-    f.title:SetText("Deedkeeper")
+    f.title:SetText("Laurels")
 
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -2, -2)

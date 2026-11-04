@@ -1,10 +1,10 @@
 ## Interface: 16001
-## Title: Deedkeeper
+## Title: Laurels
 ## Notes: Custom RP achievements, titles, and rival challenges. v1: tracking engine.
 ## Author: charl
 ## Version: 0.2.0
-## SavedVariables: DeedkeeperDB
-## SavedVariablesPerCharacter: DeedkeeperCharDB
+## SavedVariables: LaurelsDB
+## SavedVariablesPerCharacter: LaurelsCharDB
 
 # Measured: this client refuses SAY/YELL and carries a custom CHANNEL, so the
 # ladder here is server-wide rather than proximity-based. /deed channel

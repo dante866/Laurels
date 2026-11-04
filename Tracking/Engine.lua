@@ -10,7 +10,7 @@ local addonName, ns = ...
 -- Other kinds (quest, death, emote, spell, fish) carry `id` for their numeric
 -- id, plus `cause` or `emote` where the kind has one. See Tracking/Kinds.lua.
 --
--- A "tracker" (stored in DeedkeeperDB.trackers) looks like:
+-- A "tracker" (stored in LaurelsDB.trackers) looks like:
 --   { id, name, event = "kill", match = {...}, tiers = { {count, title}, ... } }
 -- ---------------------------------------------------------------------------
 
@@ -183,7 +183,7 @@ function Engine:Increment(tracker, amount)
         ns:Print(("New title earned: |cffffd100%s|r  (%s: %d)")
             :format(safe(tier.title), safe(tracker.name), cur))
         -- TODO (v2 rival layer): broadcast {tracker.id, cur, title} over an
-        -- addon comm channel so nearby Deedkeeper users can contest it.
+        -- addon comm channel so nearby Laurels users can contest it.
     end
 
     if ns.UI and ns.UI.Refresh then ns.UI:Refresh() end

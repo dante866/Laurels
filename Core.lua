@@ -47,7 +47,7 @@ function ns:Print(...)
     end
     local frame = DEFAULT_CHAT_FRAME
     if frame then
-        frame:AddMessage("|cff66ccffDeedkeeper|r: " .. table.concat(parts, " "))
+        frame:AddMessage("|cff66ccffLaurels|r: " .. table.concat(parts, " "))
     end
 end
 
@@ -73,17 +73,17 @@ local DEFAULT_TRACKERS = {
 -- ---------------------------------------------------------------------------
 
 local function initDB()
-    DeedkeeperDB = DeedkeeperDB or {}
-    DeedkeeperDB.trackers = DeedkeeperDB.trackers or deepcopy(DEFAULT_TRACKERS)
+    LaurelsDB = LaurelsDB or {}
+    LaurelsDB.trackers = LaurelsDB.trackers or deepcopy(DEFAULT_TRACKERS)
     -- Deeds heard published by others but not adopted. Offers, not trackers.
-    DeedkeeperDB.known = DeedkeeperDB.known or {}
+    LaurelsDB.known = LaurelsDB.known or {}
 
-    DeedkeeperCharDB = DeedkeeperCharDB or {}
-    DeedkeeperCharDB.progress = DeedkeeperCharDB.progress or {}  -- trackerId -> count
-    DeedkeeperCharDB.earned   = DeedkeeperCharDB.earned   or {}  -- trackerId -> highest tier index earned
+    LaurelsCharDB = LaurelsCharDB or {}
+    LaurelsCharDB.progress = LaurelsCharDB.progress or {}  -- trackerId -> count
+    LaurelsCharDB.earned   = LaurelsCharDB.earned   or {}  -- trackerId -> highest tier index earned
 
-    ns.db = DeedkeeperDB
-    ns.charDB = DeedkeeperCharDB
+    ns.db = LaurelsDB
+    ns.charDB = LaurelsCharDB
 end
 
 -- Shown once per account. A new player arrives with the sample Kobold deed
@@ -111,7 +111,7 @@ local function initModules()
     ns.Engine:RegisterSource("fish", ns.FishSource)
     if ns.UI and ns.UI.Init then ns.UI:Init() end
     if ns.Rival and ns.Rival.Init then ns.Rival:Init() end
-    ns:Print(("v%s loaded. /deed to open the panel, /deed help for commands.")
+    ns:Print(("v%s loaded. /laurels or /deed to open the panel, /deed help for commands.")
         :format(ns.version))
     if not ns.db.seenIntro then
         ns.db.seenIntro = true
@@ -134,9 +134,11 @@ end)
 -- Slash commands
 -- ---------------------------------------------------------------------------
 
-SLASH_DEEDKEEPER1 = "/deed"
-SLASH_DEEDKEEPER2 = "/deedkeeper"
-SlashCmdList.DEEDKEEPER = function(msg)
+-- /laurels is the addon's name; /deed is shorter and reads as what you do
+-- ("/deed new"), so the help text uses it. Both run the same commands.
+SLASH_LAURELS1 = "/laurels"
+SLASH_LAURELS2 = "/deed"
+SlashCmdList.LAURELS = function(msg)
     msg = (msg or ""):gsub("^%s+", ""):gsub("%s+$", "")
     local cmd, rest = msg:match("^(%S*)%s*(.-)$")
     cmd = (cmd or ""):lower()
@@ -443,7 +445,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
             n, name, zone or "an unknown zone"))
 
     elseif cmd == "help" then
-        ns:Print("commands:")
+        ns:Print("commands (/laurels works for every one of these too):")
         ns:Print("  /deed                 toggle the panel")
         ns:Print("  /deed new             open the create-a-deed form")
         ns:Print("  /deed edit <id>       edit a deed (keeps its progress)")

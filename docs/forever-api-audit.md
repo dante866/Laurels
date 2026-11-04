@@ -1,7 +1,7 @@
 # Forever API compatibility audit
 
 **Date:** 2026-10-29
-**Analyzed:** Deedkeeper `master` @ M4 (`3478500`) — all addon source (excl. `tools/` tests)
+**Analyzed:** Laurels `master` @ M4 (`3478500`) — all addon source (excl. `tools/` tests)
 **Against:** `docs/api.json` from [Atraeau/WoW-Addons](https://github.com/Atraeau/WoW-Addons)
 (raw: `https://raw.githubusercontent.com/Atraeau/WoW-Addons/HEAD/docs/api.json`)
 
@@ -65,8 +65,8 @@ Also not in the dump, but `UI/AuthorForm.lua:307` wraps it:
 
 ## §5 Version contradiction to reconcile
 
-- `Deedkeeper.toc` → `## Interface: 16001` — **matches the dump exactly.** ✅
-- `Deedkeeper_Mists.toc` → `## Interface: 50504` (MoP Classic 5.4).
+- `Laurels.toc` → `## Interface: 16001` — **matches the dump exactly.** ✅
+- `Laurels_Mists.toc` → `## Interface: 50504` (MoP Classic 5.4).
 - `README.md` still says target is **"retail-based API."**
 
 The dump, the Mists toc, and the two absent APIs all indicate a **Classic/Mists** client.

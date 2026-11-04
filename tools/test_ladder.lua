@@ -1,7 +1,7 @@
 -- Headless test for Rival/Ladder.lua. Run from addon root:  luajit tools/test_ladder.lua
 local ns = { db = {} }
 local chunk = assert(loadfile("Rival/Ladder.lua"))
-chunk("Deedkeeper", ns)
+chunk("Laurels", ns)
 local L = ns.Ladder
 
 local pass, fail = 0, 0

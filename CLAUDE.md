@@ -1,4 +1,4 @@
-# Deedkeeper — working notes for Claude
+# Laurels — working notes for Claude
 
 ## ⚠️ FLAG: verify every new WoW API against the Forever dump BEFORE using it
 
@@ -15,8 +15,8 @@ check it actually exists in the Forever API dump. Do not assume retail availabil
   Structure: `systems[]` (each with `namespace`, `functions`, `events`), and `globals`
   (keys = every global function / `C_*` table). Grep it; if a symbol isn't there,
   treat it as unavailable and find the era-appropriate equivalent.
-- Prefer patterns that work on **both** toc targets (`Deedkeeper.toc` = 16001 and
-  `Deedkeeper_Mists.toc` = 50504).
+- Prefer patterns that work on **both** toc targets (`Laurels.toc` = 16001 and
+  `Laurels_Mists.toc` = 50504).
 
 ### Known gotchas found in the 2026-10-29 audit
 - `CombatLogGetCurrentEventInfo()` is **absent** from the dump. ✅ **Fixed** —

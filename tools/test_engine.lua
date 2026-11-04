@@ -26,7 +26,7 @@ function ns:Print(...)
 end
 
 local chunk = assert(loadfile("Tracking/Engine.lua"))
-chunk("Deedkeeper", ns)
+chunk("Laurels", ns)
 local Engine = ns.Engine
 Engine:Init()
 
@@ -182,7 +182,7 @@ check("zone-scoped deed hidden elsewhere", #Engine:TrackersMatching(
 Engine:DeleteTracker(scoped.id)
 
 -- UnitTooltip.Line: "deed 1, deed 2, +x more".
-assert(loadfile("UI/UnitTooltip.lua"))("Deedkeeper", ns)
+assert(loadfile("UI/UnitTooltip.lua"))("Laurels", ns)
 local Line = ns.UnitTooltip.Line
 local function deeds(n)
     local t = {}

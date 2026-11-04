@@ -41,7 +41,7 @@ accepting; the ladder = the scoreboard.
 
 WoW addon messages go over a chat channel via
 `C_ChatInfo.SendAddonMessage(prefix, body, channel[, target])`, after
-`C_ChatInfo.RegisterAddonMessagePrefix("DEEDK")`.
+`C_ChatInfo.RegisterAddonMessagePrefix("LAURELS")`.
 
 Which chat types carry addon messages is a **per-client fact, not a constant.**
 Measured with `/deed commtest`, prefix registered successfully on both:
@@ -73,7 +73,7 @@ than distance-based:
 | `GUILD` | whole guild anywhere | guild ladders (untested here — not in a guild) |
 | custom hidden `CHANNEL` | everyone with the addon who joined it (server-wide) | **the ladder transport** |
 
-**Decision: one shared hidden channel (`Deedkeeper`), joined on login.** The
+**Decision: one shared hidden channel (`Laurels`), joined on login.** The
 ladder is server-wide. This is arguably a better fit for the actual goal —
 publishing a deed is *issuing a challenge*, and a challenge shouldn't require
 the challenger to be standing next to you.
@@ -127,7 +127,7 @@ We ship 1 + 2 and say so plainly in the UI copy.
 
 ## 6. Protocol sketch
 
-Prefix `DEEDK`. Body `2|TYPE|...` (proto bumped 1 → 2 to carry `guid`):
+Prefix `LAURELS`. Body `2|TYPE|...` (proto bumped 1 → 2 to carry `guid`):
 - `HELLO|ver|name|guid` — presence, on login.
 - `CLAIM|deedKey|count|tier|name|ts|guid` — progress/holder update.
 - `DEFPUB|uuid|ver|serialized-definition` — publish/adopt a deed definition (M4).
@@ -143,7 +143,7 @@ All outbound sends are queued and rate-limited (§3).
 ## 7. Data model additions
 
 - Deed gains: `published` (bool), `uuid` (string, if published), `origin` (author name).
-- New store `DeedkeeperDB.ladder[deedKey] = { [guid] = {name, count, tier, ts} }`
+- New store `LaurelsDB.ladder[deedKey] = { [guid] = {name, count, tier, ts} }`
   (account-wide cache of heard claims; your own entry sourced from the current char).
 - `holders[deedKey]` is derived, not stored.
 
@@ -170,7 +170,7 @@ with LuaJIT before anything touches the game.
 4. **Throttling** — **not vendored, and deliberately so.** ✅ `Comm` queues and
    drains at a fixed interval, and hands off to **ChatThrottleLib** whenever
    that global exists. It usually does: CTL is embedded by many addons, and on
-   Forever TRP3 ships v32 at `totalRP3/Libs/ChatThrottleLib/`, so Deedkeeper is
+   Forever TRP3 ships v32 at `totalRP3/Libs/ChatThrottleLib/`, so Laurels is
    already throttling through it there. Shipping a second copy would buy
    nothing — CTL version-checks and the newest wins regardless.
 

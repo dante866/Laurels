@@ -1,10 +1,10 @@
 ## Interface: 50504
-## Title: Deedkeeper
+## Title: Laurels
 ## Notes: Custom RP achievements, titles, and rival challenges.
 ## Author: charl
 ## Version: 0.2.0
-## SavedVariables: DeedkeeperDB
-## SavedVariablesPerCharacter: DeedkeeperCharDB
+## SavedVariables: LaurelsDB
+## SavedVariablesPerCharacter: LaurelsCharDB
 
 # Measured: this client carries SAY/YELL and refuses a custom CHANNEL, the
 # exact inverse of WoW-Forever. YELL is therefore the right default here, and
@@ -16,9 +16,9 @@
 # Mists of Pandaria Classic (live Blizzard realms).
 #
 # A client picks the .toc matching its flavour and falls back to the plain
-# Deedkeeper.toc when there is none, so this file and Deedkeeper.toc coexist:
+# Laurels.toc when there is none, so this file and Laurels.toc coexist:
 # MoP Classic reads this one, WoW-Forever reads the other. Keep the file list
-# below in sync with Deedkeeper.toc.
+# below in sync with Laurels.toc.
 #
 # ## Interface above is VERIFIED: a live MoP Classic client reports TOC
 # version 50504. To re-check after a patch, run in game:

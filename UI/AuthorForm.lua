@@ -202,7 +202,7 @@ local function buildAuthorPane(f)
     -- The kind of deed. Picking one relabels the filters below (and hides
     -- the ones a kind has no use for) without clearing what's typed.
     makeLabel(f, "Event", 20, -76)
-    local evDrop = CreateFrame("Frame", "DeedkeeperEventDropDown", f,
+    local evDrop = CreateFrame("Frame", "LaurelsEventDropDown", f,
         "UIDropDownMenuTemplate")
     evDrop:SetPoint("TOPLEFT", 104, -70)
     f.eventDrop = evDrop
@@ -222,7 +222,7 @@ local function buildAuthorPane(f)
 
     -- A kind's pick-one qualifier (a death's cause, a swing's weapon), from
     -- the list in its `choices`. Sits beside the Event dropdown.
-    local choiceDrop = CreateFrame("Frame", "DeedkeeperChoiceDropDown", f,
+    local choiceDrop = CreateFrame("Frame", "LaurelsChoiceDropDown", f,
         "UIDropDownMenuTemplate")
     choiceDrop:SetPoint("TOPLEFT", 230, -70)
     f.choiceDrop = choiceDrop
@@ -278,7 +278,7 @@ local function buildAuthorPane(f)
     f.idsHint = hint
 
     makeLabel(f, "Zone", 20, -178)
-    local dd = CreateFrame("Frame", "DeedkeeperZoneDropDown", f,
+    local dd = CreateFrame("Frame", "LaurelsZoneDropDown", f,
         "UIDropDownMenuTemplate")
     dd:SetPoint("TOPLEFT", 104, -172)
     f.zoneDrop = dd
@@ -390,7 +390,7 @@ local function buildAuthorPane(f)
     -- without the form outgrowing the window. UIPanelScrollFrameTemplate has
     -- been in every client since vanilla, but templates aren't in the API
     -- dump, so a bare ScrollFrame driven by the mouse wheel is the fallback.
-    local ok, scroll = pcall(CreateFrame, "ScrollFrame", "DeedkeeperTierScroll", f,
+    local ok, scroll = pcall(CreateFrame, "ScrollFrame", "LaurelsTierScroll", f,
         "UIPanelScrollFrameTemplate")
     if not (ok and scroll) then
         scroll = CreateFrame("ScrollFrame", nil, f)

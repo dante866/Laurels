@@ -34,7 +34,7 @@ end
 function Toast:GetFrame()
     if self.frame then return self.frame end
 
-    local f = CreateFrame("Frame", "DeedkeeperToast", UIParent,
+    local f = CreateFrame("Frame", "LaurelsToast", UIParent,
         BackdropTemplateMixin and "BackdropTemplate" or nil)
     f:SetSize(440, 88)
     f:SetPoint("CENTER", 0, 180)

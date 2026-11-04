@@ -148,7 +148,7 @@ for _, f in ipairs({ "Tracking/Kinds.lua", "Tracking/Signals.lua",
         "Tracking/Sources/DeathSource.lua", "Tracking/Sources/EmoteSource.lua",
         "Tracking/Sources/SpellSource.lua", "Tracking/Sources/FishSource.lua",
         "Tracking/Sources/SwingSource.lua" }) do
-    assert(loadfile(f))("Deedkeeper", ns)
+    assert(loadfile(f))("Laurels", ns)
 end
 local Engine = ns.Engine
 Engine:Init()

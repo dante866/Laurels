@@ -1,4 +1,4 @@
-# Deedkeeper
+# Laurels
 
 A WoW addon for **custom, player-authored achievements and titles** — for RP flavor
 and for issuing challenges to other players. Define a deed ("kill Kobolds"), give it
@@ -7,15 +7,15 @@ tracks your progress and awards the title. A later version lets other addon user
 **contest and steal** a title by out-doing you.
 
 > These titles/achievements are **addon-rendered**, not real WoW titles. The game
-> server controls real titles; an addon can't grant them. Deedkeeper stores and
+> server controls real titles; an addon can't grant them. Laurels stores and
 > displays them itself, and (v2) shares them peer-to-peer with other addon users.
 
 ## Supported clients
 
 | Client | `.toc` | `## Interface` | Verified? |
 |---|---|---|---|
-| WoW-Forever 1.60.1 (build 70532) | `Deedkeeper.toc` | `16001` | ✅ measured in game |
-| Mists of Pandaria Classic | `Deedkeeper_Mists.toc` | `50504` | ✅ measured in game |
+| WoW-Forever 1.60.1 (build 70532) | `Laurels.toc` | `16001` | ✅ measured in game |
+| Mists of Pandaria Classic | `Laurels_Mists.toc` | `50504` | ✅ measured in game |
 
 Both are **Classic-flavoured clients on the modern engine** — WoW-Forever
 reports product `wow_classic_beta` — and one codebase serves both. A client
@@ -153,9 +153,9 @@ Run all headless test suites (from the addon root):
 
 ## Install
 
-Copy the `Deedkeeper` folder into your client's AddOns directory:
+Copy the `Laurels` folder into your client's AddOns directory:
 
-- **MoP Classic** — `World of Warcraft\_classic_\Interface\AddOns\Deedkeeper\`
+- **MoP Classic** — `World of Warcraft\_classic_\Interface\AddOns\Laurels\`
 - **WoW-Forever** — may use its own install folder; check its launcher.
 
 Both `.toc` files ship together and the client picks the right one.
@@ -238,7 +238,7 @@ Things to know:
 
 Published deeds of the new types travel in the same `DEFPUB` layout as kill
 deeds (see `Rival/Comm.lua`), so a kill deed broadcasts exactly as it always
-did. An older Deedkeeper hearing a new type can accept it, but has no source
+did. An older version of Laurels hearing a new type can accept it, but has no source
 for it, so it never counts there.
 
 **Competing with someone.** Publish a deed and nearby players can accept it:
@@ -339,7 +339,7 @@ Add a tracker from Lua (the in-game `/deed new` form is the normal route;
 this is for scripting or seeding defaults):
 
 ```lua
-local ns = select(2, ...)  -- or hook DeedkeeperDB directly
+local ns = select(2, ...)  -- or hook LaurelsDB directly
 ns.Engine:CreateTracker({
   name = "Murloc Hunting",
   event = "kill",

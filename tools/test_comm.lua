@@ -6,9 +6,9 @@ function ns:Print(...)
     for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
     printed[#printed + 1] = table.concat(parts, " ")
 end
-assert(loadfile("Tracking/Kinds.lua"))("Deedkeeper", ns)
+assert(loadfile("Tracking/Kinds.lua"))("Laurels", ns)
 local chunk = assert(loadfile("Rival/Comm.lua"))
-chunk("Deedkeeper", ns)
+chunk("Laurels", ns)
 local Comm = ns.Comm
 
 local pass, fail = 0, 0

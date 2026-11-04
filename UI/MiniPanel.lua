@@ -201,7 +201,7 @@ end
 -- same one used for destroying items. The id rides in the popup's data rather
 -- than an upvalue, so a second click on another row can't confirm the wrong
 -- deed.
-StaticPopupDialogs["DEEDKEEPER_DELETE_DEED"] = {
+StaticPopupDialogs["LAURELS_DELETE_DEED"] = {
     text = "Delete the deed \"%s\"?\n\nIts count and titles will be lost.",
     button1 = YES or "Yes",
     button2 = NO or "No",
@@ -214,7 +214,7 @@ StaticPopupDialogs["DEEDKEEPER_DELETE_DEED"] = {
 }
 
 function UI:ConfirmDelete(id, name)
-    StaticPopup_Show("DEEDKEEPER_DELETE_DEED", safe(name) or id, nil, id)
+    StaticPopup_Show("LAURELS_DELETE_DEED", safe(name) or id, nil, id)
 end
 
 function UI:Refresh()

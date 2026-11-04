@@ -27,7 +27,7 @@ end
 -- The NPC id inside a creature GUID, or nil for anything else.
 function Signals.NpcID(guid)
     if type(guid) ~= "string" then return nil end
-    -- Two GUID formats span the clients Deedkeeper targets:
+    -- Two GUID formats span the clients Laurels targets:
     --   * WoD+ dash form:  "Creature-0-serverID-instanceID-zoneUID-NPCID-spawnUID"
     --   * pre-WoD hex form: "0x<typebits><entry><spawn>" (e.g. Mists 5.x)
     -- Only npcID-matched deeds need this; name-matched deeds use destName and

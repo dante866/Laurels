@@ -35,8 +35,8 @@ strsplit = function(delim, str)
     return unpack(parts)
 end
 
-assert(loadfile("Tracking/Signals.lua"))("Deedkeeper", ns)
-assert(loadfile("Tracking/Sources/KillSource.lua"))("Deedkeeper", ns)
+assert(loadfile("Tracking/Signals.lua"))("Laurels", ns)
+assert(loadfile("Tracking/Sources/KillSource.lua"))("Laurels", ns)
 local KS = ns.KillSource
 
 local reported = {}

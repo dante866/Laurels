@@ -24,7 +24,7 @@ local function makeClient(name, guid)
         table.insert(c.messages, table.concat(p, " "))
     end
     for _, f in ipairs({ "Tracking/Kinds.lua", "Tracking/Engine.lua", "Rival/Ladder.lua", "Rival/Comm.lua", "Rival/Rival.lua" }) do
-        assert(loadfile(f))("Deedkeeper", ns)
+        assert(loadfile(f))("Laurels", ns)
     end
     -- Everyone contests the SAME published deed (shared uuid = as if adopted).
     ns.db.trackers[1] = {
