@@ -51,13 +51,15 @@ regardless while you correct the number.
 - [x] Tracker definitions with ascending title **tiers**
 - [x] Pluggable **sources** feeding normalized "signals" into the engine
 - [x] **KillSource** — counts killing blows via the combat log (name / npcID match)
-- [x] **Quests, deaths, emotes, spell casts, fishing** — five more deed types
-  (see [Deed types](#deed-types))
+- [x] **Thirteen more deed types** — melee swings, player kills, boss kills,
+  quests, deaths, duels, emotes, spell casts, loot, loot rolls, fishing,
+  flights, and titles held (see [Deed types](#deed-types))
 - [x] Per-character progress + account-wide definitions (SavedVariables)
-- [x] Single tabbed window (**Deeds** / **Nearby** / **New Deed**) + slash commands
+- [x] One TRP3-style window (**Deeds** / **Nearby** / **New Deed**), a minimap
+  button, and slash commands
 
 **v2 — in-game authoring**
-- [x] "New Deed" form: name, match (name-contains / NPC IDs), up to 5 title tiers
+- [x] "New Deed" form: name, what to count, filters, up to 20 title tiers
 - [x] Per-row delete button; `/deed new`, `/deed delete <id>` commands
 
 **v3 — rival / steal layer (current build)**
@@ -79,11 +81,20 @@ regardless while you correct the number.
       title and where you stand; the row tooltip carries the full ladder
 - [x] **M5.2 steal toasts** — a title changing hands shows on screen, not just
       in chat where it scrolls past mid-fight. `/deed toasts on|off|quiet|test`
+- [x] **Consent and trust** — a published deed is tied to its author by the
+      server's sender name, so nobody else can replace it; **Preview**,
+      **Accept** and **Decline** in Nearby; an author's edits arrive as an
+      **Update** you accept or keep your own version against
+- [x] **Long deeds in parts** — definitions too big for one message travel as a
+      head plus follow-ups, with **Accept** held back until every tier is in
+- [x] **TRP3 names** — rivals and authors shown by their Total RP 3 name
+- [x] `/deed simoffer` — fake published deeds, to test Nearby without a second
+      player
 
 ⚠️ **Never tested between two real clients.** Every test is headless against a
 fake bus. Messages provably leave and your own come back, but no other
 player's client has yet received, decoded and announced a claim — which is the
-entire point of v3. M4 and M5 both build on that assumption.
+entire point of v3. Everything rival-related since builds on that assumption.
 
 ### How far your ladder reaches
 
@@ -305,9 +316,10 @@ fixing a typo shouldn't cost you 400 boars.
 The id itself can't be changed: progress is stored against it and the rival
 ladder keys on it, so renaming would orphan both. Tier edits re-resolve which
 title you've earned, so lowering a threshold below your count grants that
-title immediately, and deleting tiers can take one back. Editing a *published*
-deed warns you, since rivals are still contesting the version they have —
-until M4, definitions don't propagate.
+title immediately, and deleting tiers can take one back. Saving an edit to a
+deed you *published* sends it at once: rivals who accepted it see it in
+Nearby as an **Update**, and only change their copy if they accept it. An
+edit to a deed you accepted from someone else stays yours alone.
 
 **Finding a deed's id.** `publish`, `unpublish`, `rivals` and `reset` all take
 one, so it's shown in three places: dimmed at the end of each row in `/deed`,
@@ -392,17 +404,28 @@ ns.Engine:CreateTracker({
 
 ## Roadmap
 
-**M4 — published-deed definition sync.** Today two clients must already share a
-deed's `uuid` to contest it. `DEFPUB` lets an author publish the definition so
-others can adopt it — which is the "issue a challenge" feature proper.
+M1–M5 are done (see [Status](#status)). What's next:
 
-**M5 — UI.** Holder and your rank in the panel; "you took / lost the title"
-toasts. The data is already there; nothing renders it yet.
+**Testing between two real players.** The biggest open question. Everything
+rival-related — claims, steals, Nearby, Preview, updates, long deeds sent in
+parts, titles held — has run only against simulated networks in `tools/` and
+`/deed simoffer` / `/deed simrival`. One real round trip through Blizzard's
+servers (`/deed commtest`) is all that's been confirmed.
 
-**TRP3 integration.** Done for names: with Total RP 3 installed, ladders,
-steal pop-ups and deed authors show players by their **TRP3 name** where TRP3
-knows their profile, and by game name otherwise (`Integrations/TRP3.lua`,
-public TRP3 API only; `/deed rpnames` turns it off). The core stays
-TRP3-agnostic and works the same without it. Showing *earned titles* on a
-TRP3 profile, or a TRP3-Extended "campaign/quest" module, would bind us to
-their data model — revisit once the core is proven between real players.
+**After WoW-Forever's launch.** Check the client still reports TOC `16001`
+(`/run print(GetBuildInfo())`, last value), and confirm in play the deed types
+not yet seen in game: melee swings (weapon and off-hand detection), quests,
+deaths, emotes, fishing, player kills, boss kills, duels, loot, rolls and
+flights. `/deed sources` shows what each one has picked up.
+
+**New ways of counting.** Every deed so far counts occurrences (or, for titles
+held, a current state). Still to come:
+- *totals* — gold looted, gold from quests, damage or healing done
+- *distinct things* — zones visited, where re-entering one shouldn't count
+- *best single value* — biggest hit, biggest heal, longest fall survived
+
+**TRP3, further.** Names are done: with Total RP 3 installed, rivals and deed
+authors show by their TRP3 name (`Integrations/TRP3.lua`, `/deed rpnames`).
+Showing *earned titles* on a TRP3 profile, or a TRP3-Extended "campaign/quest"
+module, would bind us to their data model — revisit once the core is proven
+between real players.
