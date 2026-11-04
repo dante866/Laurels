@@ -110,6 +110,7 @@ local function initModules()
     ns.Engine:RegisterSource("spell", ns.SpellSource)
     ns.Engine:RegisterSource("fish", ns.FishSource)
     if ns.UI and ns.UI.Init then ns.UI:Init() end
+    if ns.MinimapButton then ns.MinimapButton:Init() end
     if ns.Rival and ns.Rival.Init then ns.Rival:Init() end
     ns:Print(("v%s loaded. /laurels or /deed to open the panel, /deed help for commands.")
         :format(ns.version))
@@ -185,6 +186,11 @@ SlashCmdList.LAURELS = function(msg)
             ns.Rival:ForceBroadcast(t)
             ns.Rival:WarnIfTiersShed(t)
         end
+
+    elseif cmd == "minimap" then
+        local shown = ns.MinimapButton:Toggle()
+        ns:Print(shown and "Minimap button shown."
+            or "Minimap button hidden. /deed minimap brings it back.")
 
     elseif cmd == "toasts" then
         local want = rest:gsub("^%s+", ""):gsub("%s+$", ""):lower()
@@ -468,6 +474,7 @@ SlashCmdList.LAURELS = function(msg)
         ns:Print("                        fake a rival, to test stealing solo")
         ns:Print("  /deed simoffer [update|forge|clear]")
         ns:Print("                        fake a published deed, to test Nearby solo")
+        ns:Print("  /deed minimap         hide or show the minimap button")
         ns:Print("  /deed toasts [on|off|quiet|test]")
         ns:Print("                        steal pop-ups: show, mute or preview")
         ns:Print("  /deed channel [type]  show or set the broadcast channel")

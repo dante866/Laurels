@@ -167,6 +167,10 @@ Everything lives in one TRP3-style window with a sidebar menu — **Deeds**, **N
 The slash commands below just open it on the right page. With TRP3 installed
 it borrows TRP3's wooden frame art; without it, the same layout in stock textures.
 
+The **wreath on the minimap** opens it too: click for your deeds, right-click
+for Nearby (its tooltip says how many are waiting), drag to move it around the
+minimap edge. `/deed minimap` hides or shows it.
+
 ```
 /deed                  toggle the window (Deeds tab)
 /deed nearby           open it on the Nearby tab
@@ -324,6 +328,8 @@ UI/NearbyPanel.lua       Nearby pane -- challenges heard, with Accept
 UI/AuthorForm.lua        New Deed / Edit Deed pane
 UI/Toast.lua             steal banners (its own overlay, not a pane)
 UI/UnitTooltip.lua       "Deeds: ..." line on a mob's tooltip
+UI/MinimapButton.lua     the wreath button on the minimap
+Media/LaurelsIcon.tga    the wreath (original art, drawn by tools/make_icon.ps1)
 ```
 
 A **source** turns WoW events into normalized **signals**:

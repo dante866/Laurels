@@ -48,3 +48,4 @@ UI\AuthorForm.lua
 UI\NearbyPanel.lua
 UI\Toast.lua
 UI\UnitTooltip.lua
+UI\MinimapButton.lua
