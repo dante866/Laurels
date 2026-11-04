@@ -9,6 +9,11 @@ ns.version = (GetMeta and GetMeta(addonName, "Version")) or "0.1.0"
 -- addon sniffing at runtime. Validated and applied in Comm:BroadcastChannel.
 ns.tocChannel = GetMeta and GetMeta(addonName, "X-BroadcastChannel")
 
+-- Likewise whether addons may read the combat log. Where they can't, even
+-- registering for it raises the game's "blocked from an action" popup, so
+-- the sources must know before they register, not find out by trying.
+ns.combatLogClosed = GetMeta and GetMeta(addonName, "X-CombatLog") == "closed"
+
 -- ---------------------------------------------------------------------------
 -- Utilities
 -- ---------------------------------------------------------------------------

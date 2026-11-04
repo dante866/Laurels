@@ -10,6 +10,9 @@ local addonName, ns = ...
 -- sword and a dagger feeds a Sword deed only from the sword's hits. It names
 -- both the exact weapon ("sword2h") and its family ("sword"), so a deed can
 -- ask for either.
+--
+-- That's the combat-log path (MoP Classic). Forever closes the combat log;
+-- see OnPlayerSwing for what changes there.
 -- ---------------------------------------------------------------------------
 
 local SwingSource = {}
@@ -66,15 +69,48 @@ function SwingSource:Init(engine)
 
     local f = CreateFrame("Frame")
     self.frame = f
-    f:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    f:RegisterEvent(ns.combatLogClosed and "PLAYER_SWING" or "COMBAT_LOG_EVENT_UNFILTERED")
     f:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
     f:SetScript("OnEvent", function(_, event, ...)
         if event == "PLAYER_EQUIPMENT_CHANGED" then
             self.weapons = nil -- re-read on the next swing
+        elseif event == "PLAYER_SWING" then
+            self:OnPlayerSwing(...)
         else
             self:OnCombatLog(ns.Signals.CombatLog(...))
         end
     end)
+end
+
+-- Enum.PlayerSwingType, with the dump's values as the fallback.
+local function swingType(key, fallback)
+    local E = Enum and Enum.PlayerSwingType
+    return (E and E[key]) or fallback
+end
+
+-- Where the combat log is closed (Forever), PLAYER_SWING fires once per
+-- auto-attack. It says which hand swung but not whether it hit, so there a
+-- swing counts even when it misses. Ranged auto-shots aren't melee swings.
+-- The target is whatever you have targeted, which for auto-attack is what
+-- you're swinging at.
+function SwingSource:OnPlayerSwing(_duration, kind)
+    local offHand
+    if kind == swingType("MainHand", 0) then offHand = false
+    elseif kind == swingType("OffHand", 1) then offHand = true
+    else return end
+    local R = ns.Signals.Readable
+    local guid = UnitGUID and R(UnitGUID("target"))
+    self:Report(offHand, UnitName and R(UnitName("target")), guid)
+end
+
+function SwingSource:Report(offHand, destName, destGUID)
+    local weapon = self:Weapon(offHand)
+    self.engine:ReportProgress(ns.Signals.Make("swing", {
+        weapon       = weapon,
+        weaponFamily = self.PARENT[weapon] or weapon,
+        name   = destName,
+        id     = ns.Signals.NpcID(destGUID),
+    }))
 end
 
 -- Looked up once per gear change rather than on every swing.
@@ -92,13 +128,5 @@ function SwingSource:OnCombatLog(...)
     local _, subevent, _, sourceGUID, _, _, _, destGUID, destName = ...
     if subevent ~= "SWING_DAMAGE" then return end
     if sourceGUID ~= UnitGUID("player") then return end
-    local offHand = select(21, ...) and true or false
-    local weapon = self:Weapon(offHand)
-
-    self.engine:ReportProgress(ns.Signals.Make("swing", {
-        weapon       = weapon,
-        weaponFamily = self.PARENT[weapon] or weapon,
-        name   = destName,
-        id     = ns.Signals.NpcID(destGUID),
-    }))
+    self:Report(select(21, ...) and true or false, destName, destGUID)
 end

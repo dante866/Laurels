@@ -12,6 +12,12 @@
 # overrides it; the transport also falls back on its own if this is wrong.
 ## X-BroadcastChannel: CHANNEL
 
+# Measured at launch (1.60.1, build 70790): registering
+# COMBAT_LOG_EVENT_UNFILTERED is forbidden here, as on modern retail. Kills,
+# melee swings and deaths use PARTY_KILL, PLAYER_SWING and the death recap
+# instead.
+## X-CombatLog: closed
+
 # NOTE: ## Interface above is the client's TOC version, NOT its build number.
 # WoW-Forever 1.60.1 (build 70532, Oct 20 2026) reports TOC version 16001.
 # To re-check after a client patch, run in-game:

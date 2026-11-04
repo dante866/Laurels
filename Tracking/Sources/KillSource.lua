@@ -1,8 +1,9 @@
 local addonName, ns = ...
 
 -- ---------------------------------------------------------------------------
--- KillSource: watches the combat log and emits a "kill" signal whenever the
--- player (or their pet) lands a killing blow.
+-- KillSource: emits a "kill" signal whenever the player (or their pet) lands
+-- a killing blow -- from the combat log, or from PARTY_KILL on clients that
+-- close the combat log to addons (Forever).
 --
 -- NOTE: this counts *killing blows*, which is simple and reliable but will
 -- undercount tag/DoT/group kills where someone else gets the final hit. Good
@@ -56,10 +57,40 @@ function KillSource:Init(engine)
 
     local f = CreateFrame("Frame")
     self.frame = f
-    f:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-    f:SetScript("OnEvent", function(_, event, ...)
-        self:OnCombatLog(event, ...)
-    end)
+    if ns.combatLogClosed then
+        -- No combat log here; PARTY_KILL carries the same killing blow.
+        f:RegisterEvent("PARTY_KILL")
+        f:SetScript("OnEvent", function(_, _, attackerGUID, targetGUID)
+            self:OnPartyKill(attackerGUID, targetGUID)
+        end)
+    else
+        f:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+        f:SetScript("OnEvent", function(_, event, ...)
+            self:OnCombatLog(event, ...)
+        end)
+    end
+end
+
+-- PARTY_KILL fires for anyone in the group; only our own (or our pet's)
+-- killing blows count. The event gives GUIDs only, so the name comes from the
+-- client, which still knows a unit it just saw die.
+function KillSource:OnPartyKill(attackerGUID, targetGUID)
+    local R = ns.Signals.Readable
+    attackerGUID, targetGUID = R(attackerGUID), R(targetGUID)
+    if not targetGUID then return end
+    self:OnKillingBlow(attackerGUID, targetGUID, ns.Signals.NameFromGUID(targetGUID))
+end
+
+function KillSource:OnKillingBlow(sourceGUID, destGUID, destName)
+    local playerGUID = UnitGUID("player")
+    local petGUID = UnitGUID("pet")
+    if sourceGUID ~= playerGUID and sourceGUID ~= petGUID then return end
+
+    self.engine:ReportProgress(KillSource.SignalFor(destName, destGUID))
+    -- A player victim is also a player kill. Kill deeds still see it too,
+    -- as they always have; only a name filter would ever match a player.
+    local pvp = KillSource.PvpSignalFor(destName, destGUID)
+    if pvp then self.engine:ReportProgress(pvp) end
 end
 
 function KillSource:OnCombatLog(event, ...)
@@ -93,14 +124,5 @@ function KillSource:OnCombatLog(event, ...)
     end
 
     if subevent ~= "PARTY_KILL" then return end
-
-    local playerGUID = UnitGUID("player")
-    local petGUID = UnitGUID("pet")
-    if sourceGUID ~= playerGUID and sourceGUID ~= petGUID then return end
-
-    self.engine:ReportProgress(KillSource.SignalFor(destName, destGUID))
-    -- A player victim is also a player kill. Kill deeds still see it too,
-    -- as they always have; only a name filter would ever match a player.
-    local pvp = KillSource.PvpSignalFor(destName, destGUID)
-    if pvp then self.engine:ReportProgress(pvp) end
+    self:OnKillingBlow(sourceGUID, destGUID, destName)
 end

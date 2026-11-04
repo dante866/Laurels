@@ -45,6 +45,28 @@ function Signals.NpcID(guid)
     return nil
 end
 
+-- A value the addon may actually use. Clients with secret-value restrictions
+-- (Forever) can hand back values that error when compared or concatenated;
+-- those count as unknown.
+function Signals.Readable(v)
+    if v == nil then return nil end
+    if issecretvalue then
+        local ok, secret = pcall(issecretvalue, v)
+        if not ok or secret then return nil end
+    end
+    return v
+end
+
+-- A unit's name from its GUID, where the client still knows it (it usually
+-- does for something just killed or hit). Nil otherwise.
+function Signals.NameFromGUID(guid)
+    if not (guid and UnitNameFromGUID) then return nil end
+    local ok, name = pcall(UnitNameFromGUID, guid)
+    name = ok and Signals.Readable(name) or nil
+    if name == "" then return nil end
+    return name
+end
+
 -- A combat-log payload, read portably. Pre-Legion-style clients (both our
 -- targets) deliver it as the event's varargs; Legion+ clients deliver nothing
 -- there and require CombatLogGetCurrentEventInfo(). Returns nothing when
