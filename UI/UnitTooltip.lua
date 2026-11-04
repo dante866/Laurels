@@ -68,7 +68,8 @@ local function onUnit(tooltip, via)
     local text = UnitTooltip.Line(ns.Engine:TrackersMatching(signal))
     if not text then return end
 
-    tooltip:AddLine(PREFIX .. text, 1, 1, 1, true)
+    -- Deed names are free text, and an accepted one came from another player.
+    tooltip:AddLine(PREFIX .. ns.Comm.Escape(text), 1, 1, 1, true)
     tooltip:Show() -- resize to fit the new line
 end
 

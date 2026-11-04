@@ -18,6 +18,10 @@ local Engine = {}
 ns.Engine = Engine
 Engine.sources = {}
 
+-- Display escaping for free text such as titles (see Comm.Escape). Guarded:
+-- the engine's headless tests load it without Comm.
+local function safe(s) return (ns.Comm and ns.Comm.Escape(s)) or s end
+
 -- --- matching -------------------------------------------------------------
 
 local function matches(criteria, signal)
@@ -177,7 +181,7 @@ function Engine:Increment(tracker, amount)
         earned[tracker.id] = newTier
         local tier = tracker.tiers[newTier]
         ns:Print(("New title earned: |cffffd100%s|r  (%s: %d)")
-            :format(tier.title, tracker.name, cur))
+            :format(safe(tier.title), safe(tracker.name), cur))
         -- TODO (v2 rival layer): broadcast {tracker.id, cur, title} over an
         -- addon comm channel so nearby Deedkeeper users can contest it.
     end

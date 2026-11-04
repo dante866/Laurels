@@ -171,7 +171,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
             t.uuid = t.uuid or ns.genUUID()
             t.origin = t.origin or ns.Rival:MyName()
             ns:Print(("published |cffffd100%s|r \226\128\148 challenge id |cffffd100%s|r")
-                :format(t.name, t.uuid))
+                :format(ns.Comm.Escape(t.name), t.uuid))
             -- Until M4 carries definitions over the wire, a rival has to be
             -- told the challenge id out of band. Print the exact command so
             -- it can be pasted straight into chat.
@@ -206,6 +206,21 @@ SlashCmdList.DEEDKEEPER = function(msg)
                 (ns.db.toastSound == false) and ", muted" or ""))
             ns:Print("  /deed toasts on | off | quiet | test")
         end
+
+    elseif cmd == "simoffer" then
+        -- A fake published deed, to try Nearby's Preview / Accept / Decline
+        -- and the update flow without a second player.
+        local variant = rest ~= "" and string.lower(rest) or nil
+        if variant == "clear" then
+            ns.Rival:ClearSimulatedOffer()
+            ns:Print("Forgot the simulated offer. A copy you accepted stays in "
+                .. "Deeds; delete it there.")
+        elseif variant and variant ~= "update" and variant ~= "forge" then
+            ns:Print("usage: /deed simoffer [update|forge|clear]")
+        else
+            ns:Print(ns.Rival:SimulateOffer(variant))
+        end
+        if ns.UI and ns.UI.RefreshNearby then ns.UI:RefreshNearby() end
 
     elseif cmd == "simrival" then
         -- Fake a rival so the steal mechanic can be exercised solo.
@@ -266,7 +281,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
                 t.origin = t.origin or "adopted"
                 ns.Rival:RecordOwnClaim(t)
                 ns:Print(("|cffffd100%s|r now contests challenge %s."):format(
-                    t.name, uuid))
+                    ns.Comm.Escape(t.name), uuid))
                 ns:Print(("  your count: %d \226\128\148 see the ladder with "
                     .. "|cff66ccff/deed rivals %s|r"):format(
                     ns.Engine:GetProgress(t.id), t.id))
@@ -278,7 +293,7 @@ SlashCmdList.DEEDKEEPER = function(msg)
         local t = ns.Engine:GetTracker(rest)
         if t then
             t.published = false
-            ns:Print("unpublished:", t.name)
+            ns:Print("unpublished:", ns.Comm.Escape(t.name))
         else
             ns:Print("no tracker with id:", rest ~= "" and rest or "(none given)")
         end
@@ -351,9 +366,9 @@ SlashCmdList.DEEDKEEPER = function(msg)
             ns.Rival:RecordOwnClaim(t)
             local standings = ns.Ladder:GetStandings(ns.Rival:KeyFor(t))
             if #standings == 0 then
-                ns:Print("no claims heard yet for:", t.name)
+                ns:Print("no claims heard yet for:", ns.Comm.Escape(t.name))
             else
-                ns:Print(("Rivals for %s:"):format(t.name))
+                ns:Print(("Rivals for %s:"):format(ns.Comm.Escape(t.name)))
                 local myGuid = ns.Rival:MyGuid()
                 for i, e in ipairs(standings) do
                     -- A claim stores the tier it reached, not the title text,
@@ -378,8 +393,8 @@ SlashCmdList.DEEDKEEPER = function(msg)
         for _, t in ipairs(ns.db.trackers) do
             local title = ns.Engine:CurrentTitle(t)
             ns:Print(("  [%s] %s = %d  %s"):format(
-                t.id, t.name, ns.Engine:GetProgress(t.id),
-                title and ("<" .. title .. ">") or ""))
+                t.id, ns.Comm.Escape(t.name), ns.Engine:GetProgress(t.id),
+                title and ("<" .. ns.Comm.Escape(title) .. ">") or ""))
         end
 
     elseif cmd == "reset" then
@@ -449,6 +464,8 @@ SlashCmdList.DEEDKEEPER = function(msg)
         ns:Print("                        with the last name/id (finds spell ids)")
         ns:Print("  /deed simrival <id> <count> <name>")
         ns:Print("                        fake a rival, to test stealing solo")
+        ns:Print("  /deed simoffer [update|forge|clear]")
+        ns:Print("                        fake a published deed, to test Nearby solo")
         ns:Print("  /deed toasts [on|off|quiet|test]")
         ns:Print("                        steal pop-ups: show, mute or preview")
         ns:Print("  /deed channel [type]  show or set the broadcast channel")

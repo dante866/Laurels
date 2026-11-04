@@ -704,7 +704,7 @@ function AuthorForm:Save()
         else
             ns:Print(("Updated deed: |cffffd100%s|r (%d tier%s)%s. "
                 .. "Progress kept."):format(
-                t.name, #tiers, #tiers == 1 and "" or "s",
+                ns.Comm.Escape(t.name), #tiers, #tiers == 1 and "" or "s",
                 match.zone and (" in " .. match.zone) or ""))
             if t.published then
                 ns:Print("  |cffff8800It's published|r \226\128\148 rivals are "
@@ -724,7 +724,7 @@ function AuthorForm:Save()
         tiers = tiers,
     })
     ns:Print(("Created deed: |cffffd100%s|r (%d tier%s)%s."):format(
-        created.name, #tiers, #tiers == 1 and "" or "s",
+        ns.Comm.Escape(created.name), #tiers, #tiers == 1 and "" or "s",
         match.zone and (" in " .. match.zone) or ""))
     -- Surface the id here: it is what every other command takes, and the
     -- obvious next step after authoring a deed is publishing it.

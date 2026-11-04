@@ -124,6 +124,17 @@ Each change of hands raises an on-screen toast as well as the chat line.
 `/deed toasts test` previews both without needing a rival; `off` or `quiet`
 if they get in the way.
 
+**Testing Nearby on your own.** `/deed simoffer` fakes a published deed from
+"Simulated Rival", again through the real receive path, so you can Preview,
+Accept or Decline it solo:
+
+```
+/deed simoffer           the offer appears in Nearby
+/deed simoffer forge     an impostor resends it with gibberish -- ignored
+/deed simoffer update    its author edits it -- an Update to preview
+/deed simoffer clear     forget the offer (an accepted copy stays in Deeds)
+```
+
 Known limitations (by design, see `docs/rival-layer.md` §5):
 - The rate cap only catches *acceleration* of a known rival; a brand-new contact's
   first absolute count can't be sanity-checked (no baseline). Social-trust covers this.

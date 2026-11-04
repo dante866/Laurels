@@ -392,5 +392,44 @@ check("now in step with the author", #Rec.ns.Rival:PendingUpdates() == 0)
 
 -- The author never gets an update offered for their own deed.
 check("no update for your own deed", #Pub.ns.Rival:PendingUpdates() == 0)
+
+-- 12. /deed simoffer: the solo test for everything in 11, through the real
+-- receive path.
+local Solo = makeClient("Solo")
+Solo.ns.db.trackers = {}
+local SR = Solo.ns.Rival
+local SIM = SR.SIM_UUID
+
+check("forging before any offer is refused", SR:SimulateOffer("forge"):find("Nothing to forge") ~= nil)
+check("and sends nothing", SR:KnownDeeds()[SIM] == nil)
+
+check("the offer arrives", SR:SimulateOffer():find("Preview it") ~= nil)
+check("credited to the simulated author", SR:KnownDeeds()[SIM].author == SR.SIM_AUTHOR)
+check("a forge against the offer is ignored", SR:SimulateOffer("forge"):find("ignored") ~= nil)
+check("and the offer is untouched", SR:KnownDeeds()[SIM].name == "Boar Botherer's Challenge")
+
+SR:Decline(SIM)
+check("a declined offer says so when resent", SR:SimulateOffer():find("declined") ~= nil)
+SR:ClearSimulatedOffer()
+check("clear forgets the decline", SR:Declined()[SIM] == nil)
+SR:SimulateOffer()
+local simDeed = SR:Adopt(SIM)
+check("the offer can be accepted", simDeed ~= nil)
+check("a resend after accepting is no change", SR:SimulateOffer():find("No change") ~= nil)
+check("the update waits for a preview", SR:SimulateOffer("update"):find("update is waiting") ~= nil)
+check("a forge against the update is ignored", SR:SimulateOffer("forge"):find("ignored") ~= nil)
+check("and the waiting update is the author's",
+    SR:Updates()[SIM] and SR:Updates()[SIM].name == "Boar Botherer's Grand Challenge")
+check("accepting the simulated update works", SR:AcceptUpdate(SIM) ~= nil
+    and #simDeed.tiers == 4)
+
+-- Free text from another player is escaped wherever it's printed.
+local Esc = makeClient("Escaper")
+Esc.ns.db.trackers = { { id = "pipe", name = "Pipe|Deed", event = "kill",
+    match = { nameContains = "Rat" }, tiers = { { count = 1, title = "Rat|cffff0000King" } } } }
+Esc.ns.Engine:Init()
+farm(Esc, "Rat", 1)
+check("an earned title is printed escaped", has(Esc, "Rat||cffff0000King"))
+check("and so is the deed name", has(Esc, "Pipe||Deed"))
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

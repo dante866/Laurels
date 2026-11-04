@@ -46,6 +46,11 @@ local function buildDeedsPane(f)
 end
 
 
+-- Deed names, tier titles and filter text are free text, and an accepted
+-- deed's came from another player -- so all of it is escaped for display, or
+-- a "|" in it would be read as a colour code or link.
+local function safe(s) return ns.Comm.Escape(s) end
+
 -- The id is the thing you need for /deed publish, reset and rivals, and it is
 -- otherwise only visible via /deed list -- so the row shows it and the tooltip
 -- spells out the commands that want it.
@@ -54,19 +59,19 @@ local function showRowTooltip(row)
     if not t then return end
 
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-    GameTooltip:AddLine(t.name, 1, 1, 1)
+    GameTooltip:AddLine(safe(t.name), 1, 1, 1)
     GameTooltip:AddLine(("ID: %s"):format(t.id), 1, 0.82, 0)
     GameTooltip:AddLine(" ")
 
     GameTooltip:AddLine(("Progress: %d"):format(ns.Engine:GetProgress(t.id)), 0.9, 0.9, 0.9)
     local curTitle = ns.Engine:CurrentTitle(t)
-    GameTooltip:AddLine(("Title: %s"):format(curTitle or "none yet"), 0.9, 0.9, 0.9)
+    GameTooltip:AddLine(("Title: %s"):format(safe(curTitle) or "none yet"), 0.9, 0.9, 0.9)
     local nextTier = ns.Engine:NextTier(t)
     if nextTier then
-        GameTooltip:AddLine(("Next: %s at %d"):format(nextTier.title, nextTier.count),
+        GameTooltip:AddLine(("Next: %s at %d"):format(safe(nextTier.title), nextTier.count),
             0.6, 0.6, 0.6)
     end
-    GameTooltip:AddLine(("Counts: %s"):format(ns.Kinds.Describe(t.event, t.match)),
+    GameTooltip:AddLine(("Counts: %s"):format(safe(ns.Kinds.Describe(t.event, t.match))),
         0.6, 0.6, 0.6)
     GameTooltip:AddLine(("Published: %s"):format(t.published and "yes" or "no"),
         0.6, 0.6, 0.6)
@@ -90,7 +95,7 @@ local function showRowTooltip(row)
                 local mine = (e.guid == myGuid)
                 GameTooltip:AddLine(
                     ("  %d. %s \226\128\148 %d%s"):format(
-                        i, e.name or "?", e.count or 0, mine and "  (you)" or ""),
+                        i, safe(e.name) or "?", e.count or 0, mine and "  (you)" or ""),
                     mine and 0.2 or 0.8, mine and 1 or 0.8, mine and 0.2 or 0.8)
             end
             if #board > 5 then
@@ -209,7 +214,7 @@ StaticPopupDialogs["DEEDKEEPER_DELETE_DEED"] = {
 }
 
 function UI:ConfirmDelete(id, name)
-    StaticPopup_Show("DEEDKEEPER_DELETE_DEED", name or id, nil, id)
+    StaticPopup_Show("DEEDKEEPER_DELETE_DEED", safe(name) or id, nil, id)
 end
 
 function UI:Refresh()
@@ -239,15 +244,16 @@ function UI:Refresh()
 
         local line
         if curTitle then
-            line = ("|cffffd100%s|r  \226\128\148  %s: %d"):format(curTitle, t.name, count)
+            line = ("|cffffd100%s|r  \226\128\148  %s: %d"):format(
+                safe(curTitle), safe(t.name), count)
         else
-            line = ("%s: %d"):format(t.name, count)
+            line = ("%s: %d"):format(safe(t.name), count)
         end
         -- The id, dimmed: needed for every /deed command that takes one.
         line = line .. ("  |cff808080[%s]|r"):format(id)
         if nextTier then
             line = line .. ("\n|cff999999   next: %s at %d  (%d to go)|r"):format(
-                nextTier.title, nextTier.count, nextTier.count - count)
+                safe(nextTier.title), nextTier.count, nextTier.count - count)
         else
             line = line .. "\n|cff999999   (all titles earned)|r"
         end

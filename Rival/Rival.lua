@@ -336,6 +336,77 @@ end
 
 -- Simulation (development) --------------------------------------------------
 
+-- A published deed from a player who isn't there, for trying Nearby's
+-- Preview / Accept / Decline and the update flow solo. Like SimulateClaim it
+-- goes through Comm:HandleRaw, so the decode and the author check are the
+-- real ones. Variants:
+--   nil       the offer, from "Simulated Rival"
+--   "update"  the same deed edited by its author (renamed, a tier added)
+--   "forge"   the same challenge id sent by someone else -- must be ignored
+-- Returns a sentence saying what happened, for the slash command to print.
+Rival.SIM_UUID   = "D-SIMOFFER"
+Rival.SIM_AUTHOR = "Simulated Rival"
+local SIM_GUID   = "Player-0-SIMOFFER"
+
+function Rival:SimulateOffer(variant)
+    local uuid = self.SIM_UUID
+    local heard = self:KnownDeeds()[uuid] or self:AdoptedUUID(uuid)
+
+    local def = { uuid = uuid, name = "Boar Botherer's Challenge", event = "kill",
+        match = { nameContains = "Boar" },
+        tiers = { { count = 10, title = "Boar Botherer" },
+                  { count = 50, title = "Boar Bane" },
+                  { count = 100, title = "Boar Legend" } } }
+    local sender = self.SIM_AUTHOR
+
+    if variant == "update" then
+        def.name = "Boar Botherer's Grand Challenge"
+        def.tiers[3] = { count = 150, title = "Boar Legend" }
+        def.tiers[4] = { count = 500, title = "Boar God" }
+    elseif variant == "forge" then
+        -- Forging only means something against a deed already heard:
+        -- against nothing, the impostor would simply be its first author.
+        if not heard then
+            return "Nothing to forge yet: run /deed simoffer first."
+        end
+        sender = "Impostor"
+        def.name = "lol"
+        def.tiers = { { count = 1, title = "|cffff0000gibberish|r" } }
+    end
+
+    -- What we hold before, so a forge can be judged by whether it changed.
+    local offerBefore, updateBefore = self:KnownDeeds()[uuid], self:Updates()[uuid]
+
+    local body = ns.Comm:Encode({ type = "DEFPUB", guid = SIM_GUID,
+        ver = ns.version, def = def })
+    ns.Comm:HandleRaw(body, sender, "SIM")
+
+    if variant == "forge" then
+        local ignored = self:KnownDeeds()[uuid] == offerBefore
+            and self:Updates()[uuid] == updateBefore
+        return ignored and "An impostor resent it as \"lol\" with one tier, and it was ignored."
+            or "|cffff4040The forged copy got through -- please report this.|r"
+    end
+    if self:Declined()[uuid] then
+        return "It's declined, so it was ignored. /deed undecline to see it again."
+    end
+    local tracker = self:AdoptedUUID(uuid)
+    if tracker then
+        return self:Updates()[uuid] and "An update is waiting in Nearby: preview it."
+            or "No change from the version you accepted."
+    end
+    return ("%s published a deed: open Nearby and Preview it."):format(self.SIM_AUTHOR)
+end
+
+-- Forget the simulated offer, its update and any decline of it. A copy
+-- you accepted stays in Deeds; delete it there like any other.
+function Rival:ClearSimulatedOffer()
+    local uuid = self.SIM_UUID
+    self:KnownDeeds()[uuid] = nil
+    self:Updates()[uuid] = nil
+    self:Declined()[uuid] = nil
+end
+
 -- Inject a claim as though another player had broadcast it.
 --
 -- Deliberately routed through Comm:HandleRaw rather than written straight to
