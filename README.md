@@ -92,6 +92,8 @@ regardless while you correct the number.
 - [x] **Long deeds in parts** — definitions too big for one message travel as a
       head plus follow-ups, with **Accept** held back until every tier is in
 - [x] **TRP3 names** — rivals and authors shown by their Total RP 3 name
+- [x] **Titles on TRP3 tooltips** — a player's TRP3 tooltip lists the titles
+      they hold in deeds you've accepted too
 - [x] `/deed simoffer` — fake published deeds, to test Nearby without a second
       player
 
@@ -370,7 +372,7 @@ Tracking/Sources/
   FlightSource.lua       TakeTaxiNode + take-off -> { kind="flight", name }
   RollSource.lua         RollOnLoot hook -> { kind="roll", roll, id, name }
   BossSource.lua         ENCOUNTER_END / BOSS_KILL -> { kind="boss", id, name }
-Integrations/TRP3.lua    TRP3 names for rivals and authors (inert without TRP3)
+Integrations/TRP3.lua    TRP3 names, and titles on TRP3 tooltips (inert without TRP3)
 UI/MainFrame.lua         the window: sidebar menu, panes, lazy pane building
 UI/MiniPanel.lua         Deeds pane -- the tracker list
 UI/NearbyPanel.lua       Nearby pane -- challenges heard, with Accept
@@ -429,7 +431,9 @@ held, a current state). Still to come:
 - *best single value* — biggest hit, biggest heal, longest fall survived
 
 **TRP3, further.** Names are done: with Total RP 3 installed, rivals and deed
-authors show by their TRP3 name (`Integrations/TRP3.lua`, `/deed rpnames`).
-Showing *earned titles* on a TRP3 profile, or a TRP3-Extended "campaign/quest"
-module, would bind us to their data model — revisit once the core is proven
-between real players.
+authors show by their TRP3 name (`Integrations/TRP3.lua`, `/deed rpnames`),
+and a player's TRP3 tooltip lists the titles they hold in deeds you share.
+Showing titles from deeds you *haven't* accepted would need players to
+broadcast what they hold. Writing titles into a TRP3 profile, or a
+TRP3-Extended "campaign/quest" module, would bind us to their data model.
+Revisit both once the core is proven between real players.

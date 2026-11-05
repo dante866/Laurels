@@ -136,6 +136,7 @@ local function initModules()
     ns.Engine:RegisterSource("boss", ns.BossSource)
     if ns.UI and ns.UI.Init then ns.UI:Init() end
     if ns.MinimapButton then ns.MinimapButton:Init() end
+    if ns.TRP3Titles then ns.TRP3Titles:Init() end
     if ns.Rival and ns.Rival.Init then ns.Rival:Init() end
     -- After the rival layer, whose ladders it reads.
     if ns.HoldSource then ns.HoldSource:Recompute() end
