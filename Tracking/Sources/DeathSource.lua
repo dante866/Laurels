@@ -116,6 +116,42 @@ function DeathSource:HitFromRecap()
         R(best.environmentalType))
 end
 
+-- /deed recap: everything the death recap holds, raw. The dump doesn't
+-- document the entries, so this is how to see what they really contain.
+function DeathSource:DumpRecap(print)
+    local D = C_DeathRecap
+    if not (D and D.GetRecapEvents) then print("no death recap on this client"); return end
+    local R = ns.Signals.Readable
+    local function show(v)
+        v = R(v)
+        if v == nil then return "?" end
+        return (tostring(v):gsub("|", "||"))
+    end
+    if D.HasRecapEvents then
+        local ok, has = pcall(D.HasRecapEvents)
+        print("HasRecapEvents: " .. (ok and show(has) or "error"))
+    end
+    if D.GetRecapLink then
+        local ok, link = pcall(D.GetRecapLink)
+        print("GetRecapLink: " .. (ok and show(link) or "error"))
+    end
+    local ok, events = pcall(D.GetRecapEvents)
+    if not ok or type(events) ~= "table" then print("GetRecapEvents: nothing"); return end
+    print(("GetRecapEvents: %d entries"):format(#events))
+    for i, e in ipairs(events) do
+        if type(e) == "table" then
+            local keys = {}
+            for k in pairs(e) do keys[#keys + 1] = tostring(k) end
+            table.sort(keys)
+            local parts = {}
+            for _, k in ipairs(keys) do parts[#parts + 1] = k .. "=" .. show(e[k]) end
+            print(("  [%d] %s"):format(i, table.concat(parts, " ")))
+        else
+            print(("  [%d] %s"):format(i, show(e)))
+        end
+    end
+end
+
 -- The hit is the combat log's last one, unless one is passed in.
 function DeathSource:OnDeath(hit)
     if hit == nil then hit = self.lastHit end

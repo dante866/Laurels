@@ -150,6 +150,12 @@ recap = { { timestamp = 700, event = "SPELL_DAMAGE", sourceGUID = OTHER, sourceN
 fire("PLAYER_DEAD"); flush()
 check("death: a player's spell", last().cause == "player" and last().name == "Bob")
 
+local lines = {}
+ns.DeathSource:DumpRecap(function(l) lines[#lines + 1] = l end)
+check("recap dump: lists every entry's fields", lines[1]
+    and lines[1]:find("1 entries") and lines[2]:find("sourceName=Bob")
+    and lines[2]:find("timestamp=700"))
+
 C_DeathRecap = nil
 fire("PLAYER_DEAD"); flush()
 check("death: no recap API still counts the death", #reported == 5 and last().cause == "other")

@@ -344,6 +344,9 @@ SlashCmdList.LAURELS = function(msg)
     elseif cmd == "commtest" then
         if ns.Diag then ns.Diag:CommTest() end
 
+    elseif cmd == "recap" then
+        ns.DeathSource:DumpRecap(function(line) ns:Print(line) end)
+
     elseif cmd == "tiptest" then
         if ns.UnitTooltip then ns.UnitTooltip:Report() end
 
@@ -476,6 +479,7 @@ SlashCmdList.LAURELS = function(msg)
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")
         ns:Print("  /deed commtest        test whether addon messages work (diagnostic)")
         ns:Print("  /deed tiptest         why a mob's tooltip does/doesn't list deeds (diagnostic)")
+        ns:Print("  /deed recap           what the last death recap holds (diagnostic)")
         ns:Print("  /deed sources         what each deed type has seen this session,")
         ns:Print("                        with the last name/id (finds spell ids)")
         ns:Print("  /deed simrival <id> <count> <name>")
