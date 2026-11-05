@@ -105,7 +105,7 @@ Kinds.ROLLS = {
 Kinds.defs = {
     kill = {
         label = "Kill", plural = "kills",
-        nameLabel = "Mob name has", idsLabel = "NPC IDs", idNoun = "NPC ID",
+        nameLabel = "Mob name", idsLabel = "NPC IDs", idNoun = "NPC ID",
         idsKey = "npcIDs",
         zoneHint = "optional \226\128\147 only counts kills in that zone",
         -- An unfiltered kill deed would count every kill in the game.
@@ -113,30 +113,30 @@ Kinds.defs = {
     },
     swing = {
         label = "Melee swing", plural = "melee hits",
-        nameLabel = "Target name has", idsLabel = "Target NPC IDs",
+        nameLabel = "Target name", idsLabel = "Target NPC IDs",
         idNoun = "target NPC ID", qualifier = "weapon", choices = Kinds.WEAPONS,
         zoneHint = "optional \226\128\147 only counts hits in that zone",
     },
     quest = {
         label = "Quest", plural = "quests turned in",
-        nameLabel = "Quest title has", idsLabel = "Quest IDs", idNoun = "quest ID",
+        nameLabel = "Quest title", idsLabel = "Quest IDs", idNoun = "quest ID",
         zoneHint = "optional \226\128\147 the zone you hand the quest in",
     },
     death = {
         label = "Death", plural = "deaths",
-        nameLabel = "Killer name has", idsLabel = "Killer NPC IDs",
+        nameLabel = "Killer name", idsLabel = "Killer NPC IDs",
         idNoun = "killer NPC ID", qualifier = "cause", choices = Kinds.CAUSES,
         zoneHint = "optional \226\128\147 only counts deaths in that zone",
     },
     emote = {
         label = "Emote", plural = "emotes",
-        nameLabel = "Target name has", idsLabel = "Target NPC IDs",
+        nameLabel = "Target name", idsLabel = "Target NPC IDs",
         idNoun = "target NPC ID", qualifier = "emote",
         zoneHint = "optional \226\128\147 only counts emotes in that zone",
     },
     spell = {
         label = "Spell cast", plural = "casts",
-        nameLabel = "Spell name has", idsLabel = "Spell IDs", idNoun = "spell ID",
+        nameLabel = "Spell name", idsLabel = "Spell IDs", idNoun = "spell ID",
         zoneHint = "optional \226\128\147 only counts casts in that zone",
         -- The client reports a stream of internal casts (auto-attacks, hidden
         -- procs), so "any spell" would count noise rather than anything chosen.
@@ -144,42 +144,42 @@ Kinds.defs = {
     },
     fish = {
         label = "Fishing", plural = "fishing catches",
-        nameLabel = "Catch name has",
+        nameLabel = "Catch name",
         -- No ids: a catch is a loot window, and item ids aren't asked for.
         zoneHint = "optional \226\128\147 only counts catches in that zone",
     },
     pvp = {
         label = "Player kill", plural = "player kills",
-        nameLabel = "Victim name has",
+        nameLabel = "Victim name",
         qualifier = "target", choices = Kinds.PVP_TARGETS,
         zoneHint = "optional \226\128\147 only counts kills in that zone",
     },
     boss = {
         label = "Boss kill", plural = "boss kills",
-        nameLabel = "Boss name has", idsLabel = "Encounter IDs", idNoun = "encounter ID",
+        nameLabel = "Boss name", idsLabel = "Encounter IDs", idNoun = "encounter ID",
         zoneHint = "optional \226\128\147 only counts kills in that zone",
     },
     duel = {
         label = "Duel", plural = "duels",
-        nameLabel = "Opponent name has",
+        nameLabel = "Opponent name",
         qualifier = "result", choices = Kinds.DUEL_RESULTS,
         zoneHint = "optional \226\128\147 only counts duels in that zone",
     },
     loot = {
         label = "Loot an item", plural = "items looted",
-        nameLabel = "Item name has", idsLabel = "Item IDs", idNoun = "item ID",
+        nameLabel = "Item name", idsLabel = "Item IDs", idNoun = "item ID",
         qualifier = "quality", choices = Kinds.QUALITIES,
         zoneHint = "optional \226\128\147 only counts loot in that zone",
     },
     roll = {
         label = "Loot roll", plural = "loot rolls",
-        nameLabel = "Item name has", idsLabel = "Item IDs", idNoun = "item ID",
+        nameLabel = "Item name", idsLabel = "Item IDs", idNoun = "item ID",
         qualifier = "roll", choices = Kinds.ROLLS,
         zoneHint = "optional \226\128\147 only counts rolls in that zone",
     },
     flight = {
         label = "Flight", plural = "flights taken",
-        nameLabel = "Destination has",
+        nameLabel = "Destination",
         zoneHint = "optional \226\128\147 the zone you fly from",
     },
     -- "Title Hoarder": how many contested deeds you currently lead. Its
@@ -187,7 +187,7 @@ Kinds.defs = {
     -- (Sources/HoldSource.lua), so it has no zone and no ids.
     hold = {
         label = "Titles held", plural = "contested deeds you lead",
-        nameLabel = "Deed name has",
+        nameLabel = "Deed name",
         noZone = true,
     },
 }
@@ -219,7 +219,7 @@ function Kinds.Describe(kind, m)
         parts[#parts + 1] = "/" .. string.lower(q) -- the emote
     end
     if m.nameContains then
-        parts[#parts + 1] = ('%s "%s"'):format(string.lower(def.nameLabel), m.nameContains)
+        parts[#parts + 1] = ('%s has "%s"'):format(string.lower(def.nameLabel), m.nameContains)
     end
     local ids = Kinds.IDs(m)
     if ids and #ids > 0 and def.idNoun then

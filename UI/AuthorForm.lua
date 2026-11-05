@@ -272,7 +272,13 @@ local function buildAuthorPane(f)
     f.emoteHint:SetPoint("TOPLEFT", 352, -77)
     f.emoteHint:SetText("e.g. hug")
 
-    f.matchLabel = makeLabel(f, "Mob name has", 20, -106)
+    -- The label names the field; the grey line under it says it's a "name
+    -- contains" match. Together on one line, "Opponent name has" ran into
+    -- the edit box.
+    f.matchLabel = makeLabel(f, "Mob name", 20, -106)
+    local contains = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    contains:SetPoint("TOPLEFT", f.matchLabel, "BOTTOMLEFT", 0, -1)
+    contains:SetText("(contains)")
     f.matchEdit = makeEdit(f, 230)
     f.matchEdit:SetPoint("TOPLEFT", 120, -102)
 
