@@ -34,6 +34,20 @@ function UnitTooltip.Line(trackers)
     return table.concat(names, ", ")
 end
 
+-- Whether you could attack this unit, so a friendly NPC whose name happens
+-- to match a deed ("Night" in a town guard's name) doesn't advertise a kill
+-- you can't make. Neutral (yellow) mobs are attackable and keep the line.
+-- Where the answer can't be read (no API, an error, a secret value) the line
+-- shows as it always did.
+function UnitTooltip.Attackable(unit)
+    if not UnitCanAttack then return true end
+    local ok, can = pcall(UnitCanAttack, "player", unit)
+    if not ok then return true end
+    can = ns.Signals.Readable(can)
+    if can == nil then return true end
+    return can and true or false
+end
+
 local PREFIX = "|cffffd100Deeds:|r "
 
 -- Whether this tooltip already carries our line. Both hooks are installed (see
@@ -61,6 +75,7 @@ local function onUnit(tooltip, via)
     local _, unit = tooltip:GetUnit()
     -- Players aren't kills a deed counts (KillSource only sees creatures).
     if not unit or UnitIsPlayer(unit) then return end
+    if not UnitTooltip.Attackable(unit) then return end
     if not (ns.db and ns.db.trackers and #ns.db.trackers > 0) then return end
     if alreadyAdded(tooltip) then return end
 
@@ -115,6 +130,8 @@ function UnitTooltip:Report()
     ns:Print(("%s: name=%s npcID=%s zone=%s zoneID=%s"):format(unit,
         tostring(signal.name), tostring(signal.npcID),
         tostring(signal.zone), tostring(signal.zoneID)))
+    ns:Print("attackable: " .. yn(UnitTooltip.Attackable(unit))
+        .. " (a deed line only shows on units you can attack)")
     local hits = ns.Engine:TrackersMatching(signal)
     ns:Print("matching deeds: " .. (UnitTooltip.Line(hits) or "none"))
 end

@@ -182,6 +182,7 @@ check("zone-scoped deed hidden elsewhere", #Engine:TrackersMatching(
 Engine:DeleteTracker(scoped.id)
 
 -- UnitTooltip.Line: "deed 1, deed 2, +x more".
+assert(loadfile("Tracking/Signals.lua"))("Laurels", ns) -- for Readable
 assert(loadfile("UI/UnitTooltip.lua"))("Laurels", ns)
 local Line = ns.UnitTooltip.Line
 local function deeds(n)
@@ -194,6 +195,19 @@ check("tooltip line: one", Line(deeds(1)) == "D1")
 check("tooltip line: two", Line(deeds(2)) == "D1, D2")
 check("tooltip line: three collapses", Line(deeds(3)) == "D1, D2, +1 more")
 check("tooltip line: five collapses", Line(deeds(5)) == "D1, D2, +3 more")
+
+-- UnitTooltip.Attackable: friendly NPCs get no line; unknown means show it.
+local Attackable = ns.UnitTooltip.Attackable
+check("attackable: no API shows the line", Attackable("mouseover") == true)
+UnitCanAttack = function(_, unit) return unit == "hostile" end
+check("attackable: a hostile mob", Attackable("hostile") == true)
+check("attackable: a friendly NPC", Attackable("friendly") == false)
+UnitCanAttack = function() error("no unit") end
+check("attackable: an error shows the line", Attackable("mouseover") == true)
+UnitCanAttack = function() return "SECRET" end
+issecretvalue = function(v) return v == "SECRET" end
+check("attackable: a secret answer shows the line", Attackable("mouseover") == true)
+UnitCanAttack, issecretvalue = nil, nil
 
 print(("\n%d passed, %d failed"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)
