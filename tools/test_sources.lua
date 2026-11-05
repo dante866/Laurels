@@ -244,6 +244,13 @@ clock = clock + 1
 DoEmote("HUG")
 check("emote: repeats a second apart both count", p("hugs") == 4)
 
+-- The dead can't emote, so a /hug from a ghost didn't happen.
+clock = clock + 1
+UnitIsDeadOrGhost = function(unit) return unit == "player" end
+DoEmote("HUG")
+check("emote: none while dead", p("hugs") == 4)
+UnitIsDeadOrGhost = nil
+
 local R = ns.EmoteSource.ResolveToken
 check("emote: plain word resolves to its token", R("hug") == "HUG")
 check("emote: leading slash is ignored", R("/hug") == "HUG")

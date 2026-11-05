@@ -59,6 +59,9 @@ end
 
 function EmoteSource:OnEmote(token, target)
     if type(token) ~= "string" or token == "" then return end
+    -- The hook sees the attempt, not whether it happened, and the dead and
+    -- ghosts can't emote (seen on Forever: a /hug while dead counted).
+    if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return end
     token = string.upper(token)
 
     local t = now()
