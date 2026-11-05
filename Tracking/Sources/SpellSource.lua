@@ -13,6 +13,13 @@ local addonName, ns = ...
 local SpellSource = {}
 ns.SpellSource = SpellSource
 
+-- Actions the client reports as casts that aren't spells to anyone playing.
+-- Challenging someone to a duel is spell 7266; the duel itself is the duel
+-- deed's, so it isn't a cast too.
+SpellSource.NOT_SPELLS = {
+    [7266] = true, -- Duel
+}
+
 local function spellName(spellID)
     if C_Spell and C_Spell.GetSpellName then
         local ok, name = pcall(C_Spell.GetSpellName, spellID)
@@ -46,7 +53,7 @@ end
 function SpellSource:OnCast(unit, _, third, _, fifth)
     if unit ~= "player" then return end
     local spellID = tonumber(third) or tonumber(fifth)
-    if not spellID then return end
+    if not spellID or self.NOT_SPELLS[spellID] then return end
     self.engine:ReportProgress(ns.Signals.Make("spell",
         { id = spellID, name = spellName(spellID) }))
 end

@@ -124,6 +124,7 @@ local ns = {
 
         deed("hearth",    "spell", { nameContains = "Hearth" }),
         deed("hearth8690","spell", { ids = { 8690 } }),
+        deed("duelspell", "spell", { ids = { 7266 } }),
 
         deed("anyfish",   "fish",  {}),
         deed("smallfish", "fish",  { nameContains = "Smallfish" }),
@@ -268,6 +269,10 @@ check("spell: someone else's cast is ignored", p("hearth") == 1)
 -- Original MoP's argument order puts the id fifth.
 fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Hearthstone", "", 12, 8690)
 check("spell: legacy argument order still yields the id", p("hearth8690") == 2)
+
+-- Challenging someone to a duel is reported as a cast; it isn't one.
+fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-guid", 7266)
+check("spell: a duel challenge isn't a cast", p("duelspell") == 0)
 
 -- --- fishing ---------------------------------------------------------------
 
