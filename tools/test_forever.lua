@@ -64,7 +64,18 @@ C_DeathRecap = { GetRecapEvents = function() return recap end }
 local ns = { combatLogClosed = true }
 local pending = {}
 function ns.After(_, fn) pending[#pending + 1] = fn end
-local function flush() local p = pending; pending = {}; for _, fn in ipairs(p) do fn() end end
+-- Runs timers until none are left, counting how many rounds that took.
+local function flush()
+    local rounds = 0
+    while #pending > 0 do
+        rounds = rounds + 1
+        local p = pending; pending = {}
+        for _, fn in ipairs(p) do fn() end
+    end
+    return rounds
+end
+local server = 515
+GetServerTime = function() return server end
 function ns:Print() end
 
 for _, f in ipairs({ "Tracking/Signals.lua", "Tracking/Sources/KillSource.lua",
@@ -139,14 +150,22 @@ check("death: the latest recap entry is the killing blow",
     #reported == 1 and last().cause == "creature" and last().name == "Bristleback Boar")
 
 -- No new recap: the same entries again are the previous death's.
-fire("PLAYER_DEAD"); flush()
+fire("PLAYER_DEAD")
+check("death: a stale recap is retried, then given up on", flush() == 5)
 check("death: a stale recap leaves the cause other", last().cause == "other" and last().name == nil)
 
-recap = { { timestamp = 600, event = "ENVIRONMENTAL_DAMAGE", environmentalType = "Falling" } }
-fire("PLAYER_DEAD"); flush()
-check("death: environmental damage gives its type", last().cause == "falling")
+-- The Teldrassil fall: the recap still held an old duel when first read,
+-- and this death's arrived a moment later.
+server = 900
+recap = { { timestamp = 600, event = "SPELL_DAMAGE", sourceGUID = OTHER, sourceName = "Jeb" } }
+fire("PLAYER_DEAD")
+pending[1](); local retry = pending[2]; pending = {}
+recap = { { timestamp = 899.5, event = "ENVIRONMENTAL_DAMAGE", environmentalType = "Falling" } }
+retry()
+check("death: an old recap waits for this death's", last().cause == "falling")
 
-recap = { { timestamp = 700, event = "SPELL_DAMAGE", sourceGUID = OTHER, sourceName = "Bob" } }
+server = 1001
+recap = { { timestamp = 1000.2, event = "SPELL_DAMAGE", sourceGUID = OTHER, sourceName = "Bob" } }
 fire("PLAYER_DEAD"); flush()
 check("death: a player's spell", last().cause == "player" and last().name == "Bob")
 
@@ -154,7 +173,7 @@ local lines = {}
 ns.DeathSource:DumpRecap(function(l) lines[#lines + 1] = l end)
 check("recap dump: lists every entry's fields", lines[1]
     and lines[1]:find("1 entries") and lines[2]:find("sourceName=Bob")
-    and lines[2]:find("timestamp=700"))
+    and lines[2]:find("timestamp=1000.2", 1, true))
 
 C_DeathRecap = nil
 fire("PLAYER_DEAD"); flush()

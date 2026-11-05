@@ -24,7 +24,8 @@ local DeathSource = {}
 ns.DeathSource = DeathSource
 
 DeathSource.RECENT = 10 -- seconds
-DeathSource.RECAP_DELAY = 1
+DeathSource.RECAP_DELAY = 1 -- seconds between looks at the recap
+DeathSource.RECAP_TRIES = 5
 
 local DAMAGE = {
     SWING_DAMAGE = true, RANGE_DAMAGE = true, SPELL_DAMAGE = true,
@@ -54,8 +55,7 @@ function DeathSource:Init(engine)
         if event ~= "PLAYER_DEAD" then
             self:OnCombatLog(ns.Signals.CombatLog(...))
         elseif ns.combatLogClosed then
-            -- The recap is written as you die; give it a moment to land.
-            ns.After(self.RECAP_DELAY, function() self:OnDeath(self:HitFromRecap()) end)
+            self:AwaitRecap(1)
         else
             self:OnDeath()
         end
@@ -94,7 +94,8 @@ end
 -- hits you took. The dump doesn't list the entries' fields, so they're read
 -- by the names Blizzard's own recap frame uses, and anything missing or
 -- secret just leaves the cause "other". The killing blow is the entry with
--- the latest timestamp; the same one as last time is a previous death's.
+-- the latest timestamp (measured: entries come newest first). Returns the hit,
+-- or nil and true when the recap is a previous death's.
 function DeathSource:HitFromRecap()
     local D = C_DeathRecap
     if not (D and D.GetRecapEvents) then return nil end
@@ -109,8 +110,12 @@ function DeathSource:HitFromRecap()
         end
     end
     if not best then return nil end
-    -- The same killing blow as last time means no new recap was written.
-    if bestAt and bestAt == self.lastRecapAt then return nil end
+    -- Until this death's recap is written, the game hands back the previous
+    -- one. Measured on Forever: entry timestamps are wall-clock seconds, so
+    -- an old killing blow, or the same one as last time, is a stale recap.
+    local clock = (GetServerTime and GetServerTime()) or (time and time())
+    if bestAt and clock and clock - bestAt > self.RECENT then return nil, true end
+    if bestAt and bestAt == self.lastRecapAt then return nil, true end
     self.lastRecapAt = bestAt
     return describeHit(R(best.event), R(best.sourceGUID), R(best.sourceName),
         R(best.environmentalType))
@@ -152,9 +157,21 @@ function DeathSource:DumpRecap(print)
     end
 end
 
--- The hit is the combat log's last one, unless one is passed in.
-function DeathSource:OnDeath(hit)
-    if hit == nil then hit = self.lastHit end
+-- The recap is written as you die, sometimes after PLAYER_DEAD. A fall
+-- death in Teldrassil read the previous recap and blamed the last duel
+-- opponent. So look again, a few times, until a recap from this death turns
+-- up; failing that the death still counts, as "other".
+function DeathSource:AwaitRecap(try)
+    ns.After(self.RECAP_DELAY, function()
+        local hit, stale = self:HitFromRecap()
+        if stale and try < self.RECAP_TRIES then return self:AwaitRecap(try + 1) end
+        self:OnDeath(hit, true)
+    end)
+end
+
+-- The hit is the combat log's last one, unless it comes from the recap.
+function DeathSource:OnDeath(hit, fromRecap)
+    if not fromRecap then hit = self.lastHit end
     self.lastHit = nil
     if hit and now() - hit.at > self.RECENT then hit = nil end
 
