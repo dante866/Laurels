@@ -34,6 +34,12 @@ engine normally has that's *missing* here usually means restricted, not old.
   without checking `ns.combatLogClosed`.** The October audit got this wrong.
   It read the missing `CombatLogGetCurrentEventInfo()` as "old client, payload
   in varargs". That varargs path is still what MoP Classic uses.
+- **Death recap on Forever (measured):** `C_DeathRecap.GetRecapEvents()`
+  entries come newest first, with combat-log field names (`event`,
+  `environmentalType`, `sourceName`, `sourceGUID`, `amount`, `currentHP`...)
+  and wall-clock `timestamp`s. Right after `PLAYER_DEAD` it can still return
+  the *previous* recap, so `DeathSource` retries until the killing blow is
+  recent. `/deed recap` prints the raw recap.
 - Forever has **secret values**: wrap anything read from the game in combat
   (GUIDs, names) in `ns.Signals.Readable`, which turns a secret into nil.
 - `Core.lua` prints the name of any forbidden or blocked call in chat. The
