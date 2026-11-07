@@ -38,6 +38,33 @@
 > central, also look in the dump for signs the call is *restricted* (the rows
 > above), and treat a missing function that the modern engine normally has as
 > a reason to ask why.
+
+> ## ⚠️ Correction, 2026-11-07 (addon messaging, live 1.60.1)
+>
+> **Addon messages on a custom channel don't deliver on live Forever.** Beta
+> 70532 delivered them, which is why `Laurels.toc` picks `CHANNEL`. Measured
+> with `/deed commtest` on the RP ruleset:
+>
+> | Chat type | Send result | Delivered? |
+> |---|---|---|
+> | `SAY` / `YELL` | 4 (refused) | no |
+> | `CHANNEL` | 0 (success) | **no** |
+> | `WHISPER` | 0 | yes (self-echo, and TRP3/MSP2 traffic from another player) |
+>
+> A Reddit report on 70790 and 70862 shows the same pattern, plus a
+> `CHAT_MSG_CHANNEL_NOTICE: NOT_ALLOWED_IN_CHANNEL` shortly after each
+> `CHANNEL` send. `C_ChatInfo.AreOutgoingAddonChatMessagesRestricted()`
+> returns true (in the Reddit report and on Charles's client). The dump
+> describes that switch as set per realm, but Forever has rulesets rather than
+> realms. The send "succeeds", so Laurels' fallback on a refused send never
+> triggers, and the rival layer fails without any warning.
+>
+> **Communities (`/deed clubtest`, same day):** an addon can list communities,
+> streams and members, and can read stream history (author and text readable,
+> not secret). `C_Club.SendMessage` from an addon is **blocked**
+> (`ADDON_ACTION_BLOCKED`, "Interface action failed because of an AddOn"). The
+> test community was a Battle.net community (`clubType` 0), so members show
+> as BattleTag and `BNetAccount` GUIDs, not character names.
 >
 > §1, §5 and the recommended actions below are kept as written in October,
 > with notes where they were wrong.
