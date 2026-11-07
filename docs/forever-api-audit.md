@@ -66,6 +66,16 @@
 > test community was a Battle.net community (`clubType` 0), so members show
 > as BattleTag and `BNetAccount` GUIDs, not character names.
 >
+> A WoW community (`clubType` 1, one faction only) lists character names and
+> `Player-…` GUIDs. Text placed in the Communities window's chat box by
+> Laurels posts fine when the player presses Enter. **Addons can't read the
+> text of community messages:** the live `CLUB_MESSAGE_ADDED` →
+> `GetMessageInfo`, a history re-read, and `CHAT_MSG_COMMUNITIES_CHANNEL` all
+> return a 6-character `|Kw5|k`-style wrapper (`kstringClubMessage` in the
+> dump). The UI shows it as the real text, which is why an earlier history
+> read appeared to read "testing". This is the same in both community types.
+> So a community can't carry deed data, but its member list is readable.
+>
 > §1, §5 and the recommended actions below are kept as written in October,
 > with notes where they were wrong.
 
