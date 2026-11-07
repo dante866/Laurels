@@ -255,7 +255,81 @@ local function pickStream(streams)
     return streams[1]
 end
 
+-- The community and stream a club test runs against, or nil.
+local function clubTarget(want)
+    if not (C_Club and C_Club.GetSubscribedClubs) then return nil end
+    local ok, clubs = pcall(C_Club.GetSubscribedClubs)
+    local club = ok and type(clubs) == "table" and pickClub(clubs, want)
+    if not club then return nil end
+    local sok, streams = pcall(C_Club.GetStreams, club.clubId)
+    if not sok or type(streams) ~= "table" or #streams == 0 then return nil end
+    return club, pickStream(streams)
+end
+
+-- /deed clubtest [name] post -- addons can't call C_Club.SendMessage
+-- themselves (blocked, measured 2026-11-07). Can Laurels fill the Communities
+-- window's chat box and let the player press Enter, and then read the post
+-- back? The box is Blizzard UI code, not in the dump, so it's guarded.
+function Diag:ClubPostTest(want)
+    ns:Print("=== community post test (copy ALL of this to Claude) ===")
+    local club, stream = clubTarget(want)
+    if not club then
+        ns:Print("  !! no community matching that name -- run /deed clubtest <part of its name> post")
+        return
+    end
+    local clubId, streamId = club.clubId, stream.streamId
+    ns:Print(("  community: %s / %s"):format(shown(club.name), shown(stream.name)))
+
+    local frame = CommunitiesFrame
+    local box = frame and frame.ChatEditBox
+    line("CommunitiesFrame", frame and (frame:IsShown() and "open" or "closed") or "not loaded")
+    line("  .ChatEditBox", box and "present" or "MISSING")
+    if not (frame and frame:IsShown() and box) then
+        ns:Print("  Open the Communities window on that community's General, then run this again.")
+        return
+    end
+    if frame.GetSelectedClubId then
+        local ok, sel = pcall(frame.GetSelectedClubId, frame)
+        line("  window is showing this community", ok and tostring(sel == clubId) or "unknown")
+    end
+
+    local sent = CLUB_TEST_TEXT:format(math.random(1000, 9999))
+    local f = CreateFrame("Frame")
+    local heard = 0
+    try("RegisterEvent CLUB_MESSAGE_ADDED", f.RegisterEvent, f, "CLUB_MESSAGE_ADDED")
+    f:SetScript("OnEvent", function(_, _, cId, sId, msgId)
+        if cId ~= clubId or sId ~= streamId then return end
+        heard = heard + 1
+        local gok, msg = pcall(C_Club.GetMessageInfo, clubId, streamId, msgId)
+        if not gok or not msg then
+            ns:Print("  <- message added, but GetMessageInfo gave nothing")
+            return
+        end
+        local mine = (ns.Signals.Readable(msg.content) == sent)
+            and "  <== OURS, read back intact" or ""
+        ns:Print(("  <- message added: author=%s content=%s%s"):format(
+            shown(msg.author and msg.author.name), shown(msg.content), mine))
+    end)
+
+    local ok, err = pcall(function()
+        box:SetText(sent)
+        box:SetFocus()
+    end)
+    line("filled the chat box", ok and "yes" or ("ERROR: " .. tostring(err)))
+    if not ok then f:UnregisterAllEvents(); return end
+    ns:Print("  |cffffd100Press Enter in the community window within 30 seconds.|r")
+
+    after(30, function()
+        f:UnregisterAllEvents()
+        ns:Print(("=== result: %d message(s) seen arriving ==="):format(heard))
+    end)
+end
+
 function Diag:ClubTest(want)
+    want = want or ""
+    local name, mode = want:match("^(.-)%s*(post)$")
+    if mode then return self:ClubPostTest(name) end
+
     ns:Print("=== community test (copy ALL of this to Claude) ===")
     local C = C_Club
     if not C then
