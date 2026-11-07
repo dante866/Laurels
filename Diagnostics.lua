@@ -211,3 +211,180 @@ function Diag:CommTest()
         end)
     end)
 end
+
+-- ---------------------------------------------------------------------------
+-- /deed clubtest [community] -- can Laurels use a Blizzard Community?
+--
+-- Forever drops addon messages on custom channels (measured 2026-11-07), and
+-- a community could stand in: deeds posted to a stream persist, and the
+-- member list names who to whisper. Every C_Club call used here is in the
+-- Forever dump, but the dump doesn't say which ones an addon may make or
+-- whether what comes back is a secret value -- the combat log taught us
+-- that. So this walks it: list communities -> streams -> members -> read
+-- recent history -> post one visible test message and read it back.
+-- ---------------------------------------------------------------------------
+
+local CLUB_TEST_TEXT = "[Laurels test] ping %d -- please ignore"
+
+-- A value as text, saying so when it's a secret the addon can't read.
+local function shown(v)
+    if v ~= nil and ns.Signals.Readable(v) == nil then return "<secret>" end
+    return tostring(v)
+end
+
+-- pcall that reports a failure under `label`.
+local function try(label, fn, ...)
+    local ok, a = pcall(fn, ...)
+    if not ok then line(label, "ERROR: " .. tostring(a)) end
+    return ok, a
+end
+
+local function pickClub(clubs, want)
+    want = (want and want ~= "") and string.lower(want) or "laurels"
+    for _, c in ipairs(clubs) do
+        local name = ns.Signals.Readable(c.name)
+        if name and string.find(string.lower(name), want, 1, true) then return c end
+    end
+end
+
+-- The first stream anyone can post in (normally General).
+local function pickStream(streams)
+    for _, s in ipairs(streams) do
+        if not s.leadersAndModeratorsOnly then return s end
+    end
+    return streams[1]
+end
+
+function Diag:ClubTest(want)
+    ns:Print("=== community test (copy ALL of this to Claude) ===")
+    local C = C_Club
+    if not C then
+        ns:Print("  !! no C_Club on this client")
+        return
+    end
+
+    -- 1. Is the system on, and is anything restricted?
+    local function flag(label, fn)
+        if not fn then line(label, "MISSING"); return end
+        local ok, v = try(label, fn)
+        if ok then line(label, shown(v)) end
+    end
+    flag("C_Club.IsEnabled", C.IsEnabled)
+    flag("C_Club.IsRestricted", C.IsRestricted)
+    if C_ChatInfo then
+        flag("AreOutgoingAddonChatMessagesRestricted",
+            C_ChatInfo.AreOutgoingAddonChatMessagesRestricted)
+        flag("InChatMessagingLockdown", C_ChatInfo.InChatMessagingLockdown)
+    end
+
+    -- 2. Communities we're in.
+    local ok, clubs = try("GetSubscribedClubs", C.GetSubscribedClubs)
+    if not ok or type(clubs) ~= "table" then return end
+    line("communities", #clubs)
+    for _, c in ipairs(clubs) do
+        ns:Print(("    %s  type=%s members=%s crossFaction=%s"):format(
+            shown(c.name), shown(c.clubType), shown(c.memberCount),
+            shown(c.crossFaction)))
+    end
+    local club = pickClub(clubs, want)
+    if not club then
+        ns:Print("  !! no community matching that name -- run /deed clubtest <part of its name>")
+        return
+    end
+    local clubId = club.clubId
+    ns:Print("  testing: " .. shown(club.name))
+
+    -- 3. Streams (the community's chat channels).
+    local sok, streams = try("GetStreams", C.GetStreams, clubId)
+    if not sok or type(streams) ~= "table" or #streams == 0 then
+        line("streams", "none")
+        return
+    end
+    for _, s in ipairs(streams) do
+        ns:Print(("    stream %s  modsOnly=%s"):format(
+            shown(s.name), shown(s.leadersAndModeratorsOnly)))
+    end
+    local stream = pickStream(streams)
+    local streamId = stream.streamId
+    ns:Print("  using stream: " .. shown(stream.name))
+
+    -- 4. Members: are the names (who we'd whisper) readable?
+    local mok, members = try("GetClubMembers", C.GetClubMembers, clubId)
+    if mok and type(members) == "table" then
+        line("members", #members)
+        for i = 1, math.min(#members, 5) do
+            local iok, info = try("GetMemberInfo", C.GetMemberInfo, clubId, members[i])
+            if iok and info then
+                ns:Print(("    %s  guid=%s presence=%s self=%s"):format(
+                    shown(info.name), shown(info.guid),
+                    shown(info.presence), shown(info.isSelf)))
+            end
+        end
+    end
+
+    -- 5. Ask for recent history, then post. Watch what arrives. The frame is
+    -- dropped at the end so it doesn't keep printing (commtest's does).
+    local sent = CLUB_TEST_TEXT:format(math.random(1000, 9999))
+    local f = CreateFrame("Frame")
+    local heard = 0
+    for _, ev in ipairs({ "CLUB_MESSAGE_ADDED", "CLUB_MESSAGE_HISTORY_RECEIVED" }) do
+        try("RegisterEvent " .. ev, f.RegisterEvent, f, ev)
+    end
+    f:SetScript("OnEvent", function(_, ev, cId, sId, msgId)
+        if cId ~= clubId or sId ~= streamId then return end
+        if ev == "CLUB_MESSAGE_HISTORY_RECEIVED" then
+            ns:Print("  <- history received")
+            return
+        end
+        heard = heard + 1
+        local gok, msg = pcall(C.GetMessageInfo, clubId, streamId, msgId)
+        if not gok or not msg then
+            ns:Print("  <- message added, but GetMessageInfo gave nothing")
+            return
+        end
+        local mine = (ns.Signals.Readable(msg.content) == sent)
+            and "  <== OURS, read back intact" or ""
+        ns:Print(("  <- message added: author=%s content=%s%s"):format(
+            shown(msg.author and msg.author.name), shown(msg.content), mine))
+    end)
+
+    if C.FocusStream then try("FocusStream", C.FocusStream, clubId, streamId) end
+    if C.RequestMoreMessagesBefore then
+        try("RequestMoreMessagesBefore", C.RequestMoreMessagesBefore,
+            clubId, streamId, nil, 5)
+    end
+    ns:Print("  (reading history in 3s, then posting one visible test message)")
+
+    after(3, function()
+        local rok, ranges = try("GetMessageRanges", C.GetMessageRanges, clubId, streamId)
+        local last = rok and type(ranges) == "table" and ranges[#ranges]
+        if last and last.newestMessageId then
+            local bok, msgs = try("GetMessagesBefore", C.GetMessagesBefore,
+                clubId, streamId, last.newestMessageId, 3)
+            if bok and type(msgs) == "table" then
+                line("recent messages read", #msgs)
+                for _, m in ipairs(msgs) do
+                    ns:Print(("    %s: %s"):format(
+                        shown(m.author and m.author.name), shown(m.content)))
+                end
+            end
+        else
+            line("recent messages", "none downloaded")
+        end
+
+        -- SendMessage returns nothing; a block shows up as an error here or
+        -- as Core's "Forbidden/Blocked" line.
+        local pok, perr = pcall(C.SendMessage, clubId, streamId, sent)
+        line("SendMessage call", pok and "ok (no error)" or ("ERROR: " .. tostring(perr)))
+
+        after(5, function()
+            f:UnregisterAllEvents()
+            if C.UnfocusStream then pcall(C.UnfocusStream, clubId, streamId) end
+            ns:Print(("=== result: %d message(s) seen arriving ==="):format(heard))
+            if heard == 0 then
+                ns:Print("  nothing arrived -> posting is blocked or the event is withheld;")
+                ns:Print("  check the community window for: " .. sent)
+            end
+        end)
+    end)
+end

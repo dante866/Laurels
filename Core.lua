@@ -345,6 +345,9 @@ SlashCmdList.LAURELS = function(msg)
     elseif cmd == "commtest" then
         if ns.Diag then ns.Diag:CommTest() end
 
+    elseif cmd == "clubtest" then
+        if ns.Diag then ns.Diag:ClubTest(rest) end
+
     elseif cmd == "recap" then
         ns.DeathSource:DumpRecap(function(line) ns:Print(line) end)
 
@@ -479,6 +482,7 @@ SlashCmdList.LAURELS = function(msg)
         ns:Print("  /deed rivals <id>     show the leaderboard for a deed")
         ns:Print("  /deed whoami          dump name/GUID identity info (diagnostic)")
         ns:Print("  /deed commtest        test whether addon messages work (diagnostic)")
+        ns:Print("  /deed clubtest [name] what Laurels can do in a community (diagnostic)")
         ns:Print("  /deed tiptest         why a mob's tooltip does/doesn't list deeds (diagnostic)")
         ns:Print("  /deed recap           what the last death recap holds (diagnostic)")
         ns:Print("  /deed sources         what each deed type has seen this session,")
