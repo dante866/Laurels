@@ -294,10 +294,32 @@ function Diag:ClubPostTest(want)
     end
 
     local sent = CLUB_TEST_TEXT:format(math.random(1000, 9999))
+
+    -- The first live read printed content=Unknown: likely a |K-wrapped
+    -- protected string (the dump types it kstringClubMessage). Show the raw
+    -- escape codes, so a wrapper is visible rather than rendered.
+    local function raw(label, v)
+        local text = ns.Signals.Readable(v)
+        if v ~= nil and text == nil then line(label, "<secret>"); return end
+        local s = tostring(v)
+        ns:Print(("    %s: type=%s len=%d raw=%s matches=%s"):format(label, type(v), #s,
+            (s:gsub("|", "||")), tostring(s == sent)))
+    end
+
     local f = CreateFrame("Frame")
     local heard = 0
     try("RegisterEvent CLUB_MESSAGE_ADDED", f.RegisterEvent, f, "CLUB_MESSAGE_ADDED")
-    f:SetScript("OnEvent", function(_, _, cId, sId, msgId)
+    -- The stream also shows as a chat channel ("11. DeedA"); its chat event
+    -- is a second way the text might be readable.
+    try("RegisterEvent CHAT_MSG_COMMUNITIES_CHANNEL", f.RegisterEvent, f,
+        "CHAT_MSG_COMMUNITIES_CHANNEL")
+    f:SetScript("OnEvent", function(_, ev, a1, a2, a3)
+        if ev == "CHAT_MSG_COMMUNITIES_CHANNEL" then
+            ns:Print("  <- chat event, sender=" .. shown(a2))
+            raw("chat text", a1)
+            return
+        end
+        local cId, sId, msgId = a1, a2, a3
         if cId ~= clubId or sId ~= streamId then return end
         heard = heard + 1
         local gok, msg = pcall(C_Club.GetMessageInfo, clubId, streamId, msgId)
@@ -305,10 +327,25 @@ function Diag:ClubPostTest(want)
             ns:Print("  <- message added, but GetMessageInfo gave nothing")
             return
         end
-        local mine = (ns.Signals.Readable(msg.content) == sent)
-            and "  <== OURS, read back intact" or ""
-        ns:Print(("  <- message added: author=%s content=%s%s"):format(
-            shown(msg.author and msg.author.name), shown(msg.content), mine))
+        ns:Print("  <- message added, author=" .. shown(msg.author and msg.author.name))
+        raw("live content", msg.content)
+
+        -- The same message read back from history a moment later.
+        after(2, function()
+            local rok, ranges = pcall(C_Club.GetMessageRanges, clubId, streamId)
+            local last = rok and type(ranges) == "table" and ranges[#ranges]
+            if not (last and last.newestMessageId) then
+                line("history re-read", "no ranges")
+                return
+            end
+            local bok, msgs = pcall(C_Club.GetMessagesBefore, clubId, streamId,
+                last.newestMessageId, 1)
+            if bok and type(msgs) == "table" and msgs[1] then
+                raw("history content", msgs[1].content)
+            else
+                line("history re-read", "nothing")
+            end
+        end)
     end)
 
     local ok, err = pcall(function()
